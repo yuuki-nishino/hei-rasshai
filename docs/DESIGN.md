@@ -1,0 +1,175 @@
+# へい、らっしゃい！（hei-rasshai）設計書
+
+[SPEC.md](./SPEC.md) の要件を実現するための設計の全体像。詳細は、`design/` の各文書に分ける。
+状態：初期案。★は、実装前に Emulator や実機で検証する項目。
+
+## 1. 全体像
+
+```
+[お客様のスマホ]                      [スタッフの端末（1台が基本）]
+  /s?e=&o=（QR）                         / （Google ログイン）
+  customer.html（軽い別エントリ）         index.html（Preact・Service Worker）
+        │ onSnapshot（注文1件）                 │ Auth / Firestore
+        └──────────────┬─────────────────────┘
+                       ▼
+              Firebase（Spark・無料）
+              ├─ Authentication（Google）
+              ├─ Cloud Firestore（asia-northeast1）
+              └─ Hosting
+```
+
+- サーバー（自前のAPI）はない。クライアントが、Firestore に、セキュリティルールの下で直接アクセスする
+- アクセス制御は、すべて `firestore.rules`。クライアントのチェックは、あくまで使いやすさのため
+
+## 2. 詳細設計の文書
+
+| 文書 | 内容 |
+|---|---|
+| [design/data-model.md](./design/data-model.md) | コレクション・項目・制約・インデックス・状態遷移・集計/CSV/パースの計算仕様 |
+| [design/security-rules.md](./design/security-rules.md) | 権限表、`firestore.rules`、招待・参加・イベント作成の流れ、ルールの検証項目 |
+| [design/data-access.md](./design/data-access.md) | API設計（データアクセス層の関数・型・エラー・購読・接続状態・イベント削除） |
+| [design/order-confirm.md](./design/order-confirm.md) | 注文確定フロー（状態遷移・トランザクション・確認・復元） |
+| [design/screens.md](./design/screens.md) | 画面ごとの設計（データ・状態・操作・エラー・お客様画面） |
+| [design/testing.md](./design/testing.md) | テスト計画（ドメイン・ルール・結合・実機） |
+
+設計判断の記録：[ADR-0001 Preact](./adr/0001-use-preact.md)、[ADR-0002 PWAの範囲](./adr/0002-pwa-scope.md)、[ADR-0003 招待はメールアドレス宛て](./adr/0003-invite-by-email.md)
+
+## 3. 技術構成
+
+| 項目 | 採用 |
+|---|---|
+| フロント | Vite + TypeScript + Preact（ADR-0001）、`@preact/signals` |
+| PWA | `vite-plugin-pwa`。Service Workerは最後に導入。ホーム画面への追加は任意（ADR-0002） |
+| DB | Cloud Firestore（Spark・無料、`asia-northeast1`） |
+| 認証 | Firebase Authentication（Googleのみ）。★U1 |
+| ホスティング | Firebase Hosting（無料） |
+| Firebase SDK | modular SDK（`firebase/app`, `firebase/auth`, `firebase/firestore`） |
+| QR生成 | `qrcode-generator` などの軽量ライブラリ（クライアント側。スタッフ側のみ） |
+| テスト | Vitest、Firebase Emulator Suite、`@firebase/rules-unit-testing` |
+
+## 4. アプリの構成
+
+### 4.1 レイヤー
+```
+UI（screens / components）
+  └─ 状態（signals・hooks）
+       └─ データアクセス（lib/data）… Firestore / Auth を呼ぶ唯一の場所
+            └─ ドメイン（lib/domain）… 日付・集計・遷移・パース・CSV。Firebaseに依存しない純粋関数
+```
+- 依存は、上から下の一方向。UI が Firestore を直接呼ばない。ドメインは、Firebase を import しない（単体テストしやすくするため）
+
+### 4.2 ディレクトリ
+```
+hei-rasshai/
+├─ index.html                 # スタッフ用エントリ
+├─ customer.html              # お客様用エントリ（別バンドル）
+├─ src/
+│  ├─ staff/                  # スタッフ画面（app, auth, event, order, kitchen, sales, closing, menu）
+│  ├─ customer/               # お客様画面
+│  ├─ components/             # 共通部品（StatusBar, ConfirmDialog, Toast, BigButton …）
+│  ├─ state/                  # signals（認証・現在のイベント・接続状態・購読データ）
+│  └─ lib/
+│     ├─ firebase.ts          # 初期化（スタッフ用／お客様用）。Emulator接続
+│     ├─ data/                # auth, events, members, menu, orders, closings, errors
+│     └─ domain/              # day, summary, closing, bulkMenu, csv, order(遷移・計算), url
+├─ public/                    # アイコン、manifest（Service Worker導入時）
+├─ docs/                      # SPEC.md, DESIGN.md, design/, adr/
+├─ firestore.rules
+├─ firestore.indexes.json
+├─ firebase.json
+├─ .env.development / .env.production
+└─ test/                      # domain, rules, data（Emulator）
+```
+
+### 4.3 ビルドとホスティング
+- Vite のマルチページ構成（`index.html`、`customer.html`）。お客様用エントリは、Auth・スタッフ画面・QR生成・Service Workerを含めない
+- `firebase.json`：
+  - rewrite：`/s` → `/customer.html`、その他 → `/index.html`
+  - ヘッダー：`Referrer-Policy: same-origin`、`X-Content-Type-Options: nosniff`。Service Workerのファイルは、キャッシュしない（`Cache-Control: no-cache`）
+- ★ Service Workerのスコープと、`/s` の関係（お客様画面に影響しないこと。ナビゲーションのフォールバックから `/s` を除外する）
+
+## 5. 環境とデプロイ
+
+| 環境 | 用途 | Firebase |
+|---|---|---|
+| ローカル | 開発。Emulator（Auth・Firestore）で、本番データに触れない | Emulator |
+| 開発用プロジェクト（`hei-rasshai-dev`） | **実機での確認**（Googleログインは、実際のFirebaseが必要。Hostingのプレビューチャンネルで配信） | Spark |
+| 本番 | イベントで使う | Spark（`hei-rasshai`） |
+
+- 設定値は `.env.*` の `VITE_FIREBASE_*`。`VITE_USE_EMULATOR=true` のときだけ、Emulatorに接続する。Firebaseの設定値は、秘密ではないが、リポジトリには入れない（`.env` はgit管理外）
+- コマンド：`npm run dev` / `npm run build` / `npm test` / `firebase emulators:start`
+
+### セットアップ手順（本番・開発用とも）
+1. Firebaseプロジェクトを作成（Sparkプラン。IDの空きを確認）
+2. Firestoreを作成（本番モード、`asia-northeast1`）
+3. Authenticationで、Googleログインを有効化。承認済みドメインに、Hostingのドメインを追加
+4. ウェブアプリを登録し、設定値を `.env` に入れる
+5. `creators/{許可するメールアドレス}` を、コンソールで作成する（最初は運営者自身）
+6. `firebase deploy --only firestore:rules,firestore:indexes,hosting`
+7. 当日までに、スタッフの端末でログインする（C2）
+
+## 6. 認証
+
+- Googleログイン。永続化は `browserLocalPersistence`
+- ★U1：`signInWithPopup` / `signInWithRedirect` のどちらを使うかを決めるため、**Safariのタブ**での動作を、早めに実機（iPhone・Android）で確認する。リダイレクトを使う場合は、`authDomain` を、Hostingと同じドメインにする（ストレージの分離対策）
+- ホーム画面に追加したアプリは、Safariとは保存領域が別のため、**そのアプリの中で**ログインが必要。ポップアップ／リダイレクトの動作、アプリを閉じて開き直したときと機内モードでのログイン保持を、実機で確認できてから、追加を勧める。それまでは、Safariのタブでの利用を前提にする
+- Safariのタブのまま使う場合、しばらく開かないと、保存領域が消されてログアウトされることがある。当日の数日前にもログイン状態を確認する運用にする（C2）
+- メンバー・招待・権限の設計は、[design/security-rules.md](./design/security-rules.md)
+
+## 7. 購読の方針と無料枠
+
+Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／日。**全ユーザーで共有**する。
+
+| 画面 | 購読の方針 |
+|---|---|
+| 調理 | `status in ['preparing','ready']` のみを購読。済みの表示を出すときだけ、その日の全注文を追加で購読 |
+| 売上・レジ締め | 画面を開いたとき（と「更新」）に、その日の `day` で取得。常時購読はしない |
+| お客様 | 自分の1ドキュメントのみ購読（`onSnapshot`）。ポーリングは、読み取りが増えるため使わない |
+| メニュー | 全件購読（100件以下） |
+| イベント一覧 | コレクショングループで `members` を購読 → 各イベントを `get` |
+
+- 見積もり：1注文あたり、書き込み約5回（確定で2回、ステータス更新で約3回）。2万／日なら、全体で約4000注文／日まで。1イベント数百件なら、同時に10イベント程度まで余裕がある
+- 読み取りは、ルールの `exists` / `get` を含め、1操作あたり数回。想定規模では5万／日に収まる
+- 複合インデックスが必要なクエリは書かない。調理画面の並べ替えなどは、クライアントで行う
+
+## 8. オフラインとPWA
+
+- Firestoreのオフライン永続化を有効にする（`persistentLocalCache` + `persistentMultipleTabManager`）。**スタッフ側のみ**。お客様画面は、メモリキャッシュ
+- 注文の確定はトランザクション（通信必須）。ステータス変更は通常の書き込み（オフラインでも受け付け、復帰後に送られる）
+- 接続状態の表示：オンライン／オフライン／未送信◯件（判定方法は [design/data-access.md](./design/data-access.md) §6）
+- ステータス変更が溜まっている間に、別メンバーが同じ注文を変更した場合は、サーバー側のルール（遷移の検証）で、不正な遷移を拒否する。拒否されたら、スタッフに通知する
+- Service Worker：アプリ本体（HTML/JS/CSS）をキャッシュし、オフラインでも開けるようにする（他のアプリに切り替えて、Safariのタブが破棄されたあとの再読み込みに備える）。**開発中は入れず、マイルストーン7で独立した作業として足す**
+- `manifest`（`name`：へい、らっしゃい！、`short_name`：らっしゃい）とアイコンは用意するが、ホーム画面への追加は任意（ADR-0002）
+- Service Workerは、新しい版を、通信があるときに裏で取得し、次の起動で切り替える。イベント当日の朝にデプロイしない（運用）
+
+## 9. 運用上の設計
+
+| 項目 | 方針 |
+|---|---|
+| バックアップ | Firestoreの自動エクスポートはSparkでは使えない。**日ごとのCSV保存**を、バックアップの代わりにする（C4） |
+| 使用量の確認 | Firebaseコンソールで、読み取り・書き込みの使用量を、イベント前後に確認する（U5のときは、頻度を上げる） |
+| ログ | 画面のエラーは、`console.error` のみ。外部のログサービスは使わない |
+| 時計 | 端末の日時を、自動設定にする（`day` の計算が、端末の時計に依存するため。C2） |
+
+## 10. 実装の進め方（マイルストーン案）
+
+1. **土台**：Vite + TS + Preact、Firebase初期化（Emulator対応）、Googleログイン（★U1：Safariのタブで、popup / redirectを実機確認）、ルールとEmulatorテスト（メンバー制、招待、注文の更新制限）、`lib/domain` の骨組みとテスト
+2. **イベントとメンバー**：イベント作成、一覧、招待、参加、メンバー管理
+3. **メニュー管理**：追加・編集・並べ替え・売り切れ・まとめて追加
+4. **注文確定**：[order-confirm.md](./design/order-confirm.md) のフロー（採番、冪等性、タイムアウト、中止フラグ、確認、復元）。結合テストを書く
+5. **調理画面とお客様画面**：状態遷移、QR、リアルタイム反映（お客様画面は別エントリ）
+6. **売上とレジ締め**：集計、CSV、締め、「締め後に変更あり」
+7. **オフライン対応と接続状態の表示**：Service Workerの導入（ADR-0002）、オフライン時の挙動、未送信件数。ホーム画面アプリでのログインを実機で確認し、追加を勧めるかを決める（★U1）
+8. **仕上げ**：UI調整、実機での通し確認（[testing.md](./design/testing.md)）、イベント削除（★U4）、本番デプロイ
+
+## 11. 設計上の要確認事項（まとめ）
+
+| # | 内容 | 確認する場面 |
+|---|---|---|
+| U1 | Googleログイン（popup / redirect、`authDomain`）。Safariのタブはマイルストーン1、ホーム画面アプリは、追加を勧める前に確認 | マイルストーン1・7、実機 |
+| U4 | イベント削除（Cloud Functionsなしで、配下を消す）の件数・時間・中断時の動作 | マイルストーン8 |
+| R1〜R7 | ルールの検証項目（[security-rules.md](./design/security-rules.md) §5） | マイルストーン1・Emulator |
+| S1 | Service Workerと `/s` の関係（お客様画面に影響しないこと） | マイルストーン5・7 |
+| C1 | 確定フローの、16秒の待ち（SDKの内部の挙動に依存） | マイルストーン4 |
+| N1 | 接続状態の推定（`fromCache` が10秒続いたらオフライン）が、実機で、遅すぎ・早すぎないか | マイルストーン7 |
+| M1 | Gmailの別名・Workspaceのエイリアスで、招待のメールアドレスが一致しないときの扱い | マイルストーン2・実機 |
