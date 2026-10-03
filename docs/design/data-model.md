@@ -20,6 +20,100 @@ events/{eventId}                          イベント
 - `day` は `YYYY-MM-DD`（Asia/Tokyo）。`email` は小文字
 - 時刻は、すべて Firestore の `Timestamp`。サーバー時刻は `serverTimestamp()` を使う
 
+### 関係図（ER図）
+
+```mermaid
+erDiagram
+    AUTH_USER ||..o{ MEMBER : "uid が一致"
+    AUTH_USER }o..o| CREATOR : "email が一致"
+    AUTH_USER }o..o| INVITE : "email が一致"
+    EVENT ||--o{ MEMBER : "サブコレクション"
+    EVENT ||--o{ INVITE : "サブコレクション"
+    EVENT ||--o{ MENU : "サブコレクション"
+    EVENT ||--o{ ORDER : "サブコレクション"
+    EVENT ||--o{ COUNTER : "サブコレクション"
+    EVENT ||--o{ CLOSING : "サブコレクション"
+    ORDER ||--|{ ORDER_LINE : "items（埋め込み）"
+    MENU ||..o{ ORDER_LINE : "menuId（制約なし）"
+    MEMBER ||..o{ ORDER : "createdBy / updatedBy = uid（制約なし）"
+    COUNTER ||..o{ ORDER : "day が一致"
+    CLOSING ||..o{ ORDER : "day が一致（集計）"
+
+    AUTH_USER {
+        string uid PK
+        string email "Googleアカウント（Authentication）"
+    }
+    CREATOR {
+        string email PK "events を作れるアカウント"
+    }
+    EVENT {
+        string eventId PK
+        string name
+        string startDate
+        string endDate
+        int floatCash
+        string ownerUid FK
+    }
+    MEMBER {
+        string uid PK "events/{e}/members/{uid}"
+        string role "owner / member"
+        string displayName
+        string email
+    }
+    INVITE {
+        string email PK "events/{e}/invites/{email}"
+        string createdBy FK
+        timestamp expiresAt
+    }
+    MENU {
+        string menuId PK
+        string name
+        int price
+        number order
+        boolean soldOut
+    }
+    ORDER {
+        string orderId PK
+        int number "日別の連番"
+        string day
+        int total
+        string payment "cash / paypay"
+        string status
+        string cancelledFrom
+        boolean qr
+        string createdBy FK
+        string updatedBy FK
+    }
+    ORDER_LINE {
+        string menuId FK "書き写した参照"
+        string name "注文時点の名前"
+        int price "注文時点の価格"
+        int qty
+    }
+    COUNTER {
+        string day PK "events/{e}/counters/{day}"
+        int n "最後に発行した番号"
+    }
+    CLOSING {
+        string day PK "events/{e}/closings/{day}"
+        int floatCash
+        int expectedCash
+        int actualCash
+        int diff
+    }
+```
+
+- **実線**：サブコレクション、または埋め込み（親のパスの配下にある。親があって初めて存在する）
+- **点線**：論理的な参照。Firestore には外部キー制約がないため、**参照先が消えても、エラーにならず、残る**
+- 削除時の扱い：
+  | 参照元 → 参照先 | 参照先が消えたとき |
+  |---|---|
+  | 注文の `items[].menuId` → メニュー | メニューを削除しても、注文は、書き写した名前・価格のまま残る。集計は、`menuId + price` でまとめ、名前は注文時点のものを使う |
+  | 注文の `createdBy` / `updatedBy` → メンバー | メンバーが抜けても、注文は残る。スタッフ画面では、表示名が引けないため、「（退会済み）」と表示する |
+  | イベントの配下すべて → イベント | イベントを削除しても、配下は自動では消えない。**アプリが、配下を先に削除する**（data-access.md §7） |
+  | 招待・`creators` → アカウント | IDがメールアドレスのため、アカウントが無くても存在できる。参加・イベント作成のときに、ログイン中のメールアドレスと一致するかを、ルールが検証する |
+- `COUNTER` / `CLOSING` と `ORDER` は、IDで結ばれていない。同じ `day`（`YYYY-MM-DD`）を持つことで、対応する
+
 ## 2. 項目定義
 
 ### 2.1 creators/{email}
