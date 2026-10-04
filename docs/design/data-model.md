@@ -272,11 +272,17 @@ erDiagram
     {
       "collectionGroup": "members",
       "fieldPath": "uid",
-      "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }]
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
     }
   ]
 }
 ```
+- `fieldOverrides` は、その項目の自動の索引を**置き換える**。コレクショングループの索引だけを書くと、コレクション単位の自動の索引（昇順・降順・`array-contains`）が無効になる。そのため、自動の3つも並べて残す（[PR #26 レビュー](../reviews/pr-26-rules-review.md) P4。Emulator は索引を検査しないため、テストでは気づけない）
 
 ## 5. 導出するデータ（保存しない）
 

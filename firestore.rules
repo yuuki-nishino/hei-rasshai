@@ -15,6 +15,8 @@ service cloud.firestore {
 
     function isMember(e) { return signedIn() && exists(subPath(e, 'members', request.auth.uid)); }
     function isOwner(e)  { return signedIn() && get(eventPath(e)).data.ownerUid == request.auth.uid; }
+    // イベントがあり、削除中でない（参加・招待は、削除中・削除後のイベントでは受け付けない）
+    function isActiveEvent(e) { return exists(eventPath(e)) && get(eventPath(e)).data.deleting == false; }
 
     function canCreateEvent() {
       return signedIn() && request.auth.token.email_verified
@@ -39,7 +41,9 @@ service cloud.firestore {
         && validEvent(request.resource.data)
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.deleting == false
-        && request.resource.data.createdAt == request.time;
+        && request.resource.data.createdAt == request.time
+        // 同じバッチで、自分の members（role = owner）を作る。作らないと、オーナーにも見えないイベントになる
+        && getAfter(subPath(eventId, 'members', request.auth.uid)).data.role == 'owner';
       allow update: if isMember(eventId)
         && validEvent(request.resource.data)
         && request.resource.data.ownerUid == resource.data.ownerUid
@@ -58,11 +62,13 @@ service cloud.firestore {
           && request.resource.data.displayName is string
           && request.resource.data.displayName.size() <= 60
           && (
-            // オーナー：イベントと同じバッチで作る
+            // オーナー：イベントの ownerUid が自分なら作れる（作成は、イベントと同じバッチで行う。
+            // バッチの外でも作れるが、オーナーはイベントがある間は抜けられないため、害はない）
             (request.resource.data.role == 'owner'
               && getAfter(eventPath(eventId)).data.ownerUid == uid)
             // メンバー：自分のメールアドレス宛ての有効な招待があり、同じバッチで招待が削除される
             || (request.resource.data.role == 'member'
+              && isActiveEvent(eventId)
               && request.auth.token.email_verified
               && exists(subPath(eventId, 'invites', myEmail()))
               && request.time < get(subPath(eventId, 'invites', myEmail())).data.createdAt + duration.value(1, 'd')
@@ -81,7 +87,7 @@ service cloud.firestore {
       // ---------- 招待（有効期限は createdAt から1日。ルールが計算する） ----------
       match /invites/{email} {
         allow read: if isOwner(eventId);
-        allow create, update: if isOwner(eventId)
+        allow create, update: if isOwner(eventId) && isActiveEvent(eventId)
           && email == email.lower() && email.matches('^[^@]+@[^@]+$')
           && request.resource.data.keys().hasOnly(['createdBy', 'createdAt'])
           && request.resource.data.createdBy == request.auth.uid

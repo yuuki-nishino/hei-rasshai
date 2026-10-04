@@ -90,6 +90,20 @@ describe('参加（招待 → メンバー）', () => {
     await assertSucceeds(join(BOB));
   });
 
+  it('削除中（deleting = true）のイベントには、有効な招待があっても、参加できない（PR #26 レビュー P1）', async () => {
+    await seedInvite();
+    await updateDoc(doc(as(env, OWNER), 'events/e1'), { deleting: true });
+    await assertFails(join(BOB));
+  });
+
+  it('削除後のイベントには、招待が消し残されていても、参加できない（P1）', async () => {
+    await seedInvite();
+    const db = as(env, OWNER);
+    await updateDoc(doc(db, 'events/e1'), { deleting: true });
+    await deleteDoc(doc(db, 'events/e1'));
+    await assertFails(join(BOB));
+  });
+
   it('35：招待を削除せずに members を作るのは拒否（R1）', async () => {
     await seedInvite();
     await assertFails(join(BOB, { deleteInvite: false }));

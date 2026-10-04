@@ -2,7 +2,7 @@
 import { assertFails, assertSucceeds, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
-import { ALICE, anon, as, BOB, CAROL, createEnv, CREATOR, emailOf, eventData, OWNER, seed } from './helpers';
+import { ALICE, anon, as, BOB, CAROL, createEnv, CREATOR, dbOf, emailOf, eventData, OWNER, seed } from './helpers';
 
 let env: RulesTestEnvironment;
 beforeAll(async () => {
@@ -71,8 +71,7 @@ describe('イベントの作成', () => {
   });
 
   it('30：他人の uid を ownerUid にしたイベントは、作れない', async () => {
-    const db = as(env, CREATOR);
-    await assertFails(setDoc(doc(db, 'events/new'), newEvent(BOB)));
+    await assertFails(createBatch(CREATOR, newEvent(BOB)));
   });
 
   it('30：deleting = true では、作れない', async () => {
@@ -83,10 +82,25 @@ describe('イベントの作成', () => {
     await assertFails(createBatch(CREATOR, newEvent(CREATOR, { createdAt: new Date() })));
   });
 
-  it('イベントだけでなく、オーナーの members も、イベントと同じバッチでないと作れない（R2）', async () => {
-    // イベントが無い状態で、オーナーの members だけを作る
+  it('イベントが無いと、owner の members を作れない（R2）', async () => {
     const db = as(env, CREATOR);
     await assertFails(setDoc(doc(db, 'events/none/members', CREATOR), ownerMember(CREATOR)));
+  });
+
+  it('owner の members を同じバッチで作らないと、イベントを作れない（PR #26 レビュー P2）', async () => {
+    const db = as(env, CREATOR);
+    await assertFails(setDoc(doc(db, 'events/new'), newEvent(CREATOR)));
+  });
+
+  it('同じバッチの members が role: member なら、イベントを作れない（P2）', async () => {
+    await assertFails(createBatch(CREATOR, undefined, { ...ownerMember(CREATOR), role: 'member' }));
+  });
+
+  it('creators のIDに大文字が含まれると、一致しない（IDは小文字で登録する。DESIGN.md §5。レビュー P5）', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(dbOf(ctx), 'creators', 'Dave@example.com'), {});
+    });
+    await assertFails(createBatch('dave'));
   });
 });
 

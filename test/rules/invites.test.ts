@@ -32,6 +32,19 @@ describe('招待（オーナー）', () => {
     await assertSucceeds(deleteDoc(doc(as(env, OWNER), 'events/e1/invites', emailOf(BOB))));
   });
 
+  it('削除中（deleting = true）のイベントでは、オーナーも招待を作成・再発行できない（PR #26 レビュー P1）', async () => {
+    const db = as(env, OWNER);
+    await updateDoc(doc(db, 'events/e1'), { deleting: true });
+    await assertFails(setDoc(doc(db, 'events/e1/invites', emailOf('dave')), inviteData()));
+    await assertFails(updateDoc(doc(db, 'events/e1/invites', emailOf(BOB)), { createdAt: serverTimestamp() }));
+  });
+
+  it('削除中でも、オーナーは招待を削除できる（イベントの削除の手順 2）', async () => {
+    const db = as(env, OWNER);
+    await updateDoc(doc(db, 'events/e1'), { deleting: true });
+    await assertSucceeds(deleteDoc(doc(db, 'events/e1/invites', emailOf(BOB))));
+  });
+
   it('オーナーは、招待を読める', async () => {
     await assertSucceeds(getDocs(collection(as(env, OWNER), 'events/e1/invites')));
   });
