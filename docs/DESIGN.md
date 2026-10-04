@@ -32,7 +32,7 @@
 | [design/screens.md](./design/screens.md) | 画面ごとの設計（データ・状態・操作・エラー・お客様画面） |
 | [design/testing.md](./design/testing.md) | テスト計画（ドメイン・ルール・結合・実機） |
 
-設計判断の記録：[ADR-0001 Preact](./adr/0001-use-preact.md)、[ADR-0002 PWAの範囲](./adr/0002-pwa-scope.md)、[ADR-0003 招待はメールアドレス宛て](./adr/0003-invite-by-email.md)、[ADR-0004 「やめる」は墓標で排他する](./adr/0004-void-tombstone.md)
+設計判断の記録：[ADR-0001 Preact](./adr/0001-use-preact.md)、[ADR-0002 PWAの範囲](./adr/0002-pwa-scope.md)、[ADR-0003 招待はメールアドレス宛て](./adr/0003-invite-by-email.md)、[ADR-0004 「やめる」は墓標で排他する](./adr/0004-void-tombstone.md)、[ADR-0005 スタッフ用とお客様用を別々にビルドする](./adr/0005-separate-builds.md)
 
 ## 3. 技術構成
 
@@ -86,7 +86,7 @@ maido-ookini/
 
 ### 4.3 ビルドとホスティング
 - Vite で、`index.html`（スタッフ用）と `customer.html`（お客様用）を、**別々にビルドする**（`npm run build` が、スタッフ用 → お客様用の順に、同じ `dist/` へ出力する）。お客様用エントリは、Auth・スタッフ画面・QR生成・Service Workerを含めない
-  - 1回のビルドで2つのエントリを作る（マルチページ構成）と、Firestore SDK が共有チャンクになり、スタッフ用の永続キャッシュ（IndexedDB）のコードが、お客様用にも読み込まれる（#2で確認。gzip後 162KB → 分けると 136KB）。そのため、ビルドを分ける
+  - 1回のビルドで2つのエントリを作る（マルチページ構成）と、Firestore SDK が共有チャンクになり、スタッフ用の永続キャッシュ（IndexedDB）のコードが、お客様用にも読み込まれる（gzip後 162KB → 分けると 136KB）。そのため、ビルドを分ける（[ADR-0005](./adr/0005-separate-builds.md)）
   - お客様用のビルドは、`@firebase/auth`・`src/staff/`・`lib/firebase/staff.ts`・永続キャッシュのコードが含まれていたら、失敗させる（`vite.config.ts` の `customerBundleGuard`）
   - 開発サーバー（`npm run dev`）は、両方のHTMLを配信する（`/` と `/customer.html`。`/s` の rewrite は Hosting のみ）
 - `firebase.json`：
