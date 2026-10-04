@@ -1,4 +1,4 @@
-# へい、らっしゃい！（hei-rasshai）設計書
+# 毎度おおきに（maido-ookini）設計書
 
 [SPEC.md](./SPEC.md) の要件を実現するための設計の全体像。詳細は、`design/` の各文書に分ける。
 状態：初期案。★は、実装前に Emulator や実機で検証する項目。
@@ -60,7 +60,7 @@ UI（screens / components）
 
 ### 4.2 ディレクトリ
 ```
-hei-rasshai/
+maido-ookini/
 ├─ index.html                 # スタッフ用エントリ
 ├─ customer.html              # お客様用エントリ（別バンドル）
 ├─ src/
@@ -99,8 +99,8 @@ hei-rasshai/
 | 環境 | 用途 | Firebase |
 |---|---|---|
 | ローカル | 開発。Emulator（Auth・Firestore）で、本番データに触れない | Emulator |
-| 開発用プロジェクト（`hei-rasshai-dev`） | **実機での確認**（Googleログインは、実際のFirebaseが必要。Hostingのプレビューチャンネルで配信） | Spark |
-| 本番 | イベントで使う | Spark（`hei-rasshai`） |
+| 開発用プロジェクト（`maido-ookini-dev`） | **実機での確認**（Googleログインは、実際のFirebaseが必要。Hostingのプレビューチャンネルで配信） | Spark |
+| 本番 | イベントで使う | Spark（`maido-ookini`） |
 
 - 設定値は `.env.*` の `VITE_FIREBASE_*`。`VITE_USE_EMULATOR=true` のときだけ、Emulatorに接続する。Firebaseの設定値は、秘密ではないが、リポジトリには入れない（`.env` はgit管理外）
 - コマンド：`npm run dev` / `npm run build` / `npm test` / `firebase emulators:start`
@@ -148,7 +148,7 @@ Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／
 - 「未送信◯件」は、ローカルの書き込みの `Promise` を、アプリ側で数える（`hasPendingWrites` では、「渡した」「取り消し」の注文が、購読の範囲から外れて数えられないため）
 - ログアウト時と、メンバーでなくなったときは、端末のキャッシュ（IndexedDB）を消す（[data-access.md](./design/data-access.md) §8）
 - Service Worker：アプリ本体（HTML/JS/CSS）をキャッシュし、オフラインでも開けるようにする（他のアプリに切り替えて、Safariのタブが破棄されたあとの再読み込みに備える）。**開発中は入れず、マイルストーン7で独立した作業として足す**
-- `manifest`（`name`：へい、らっしゃい！、`short_name`：らっしゃい）とアイコンは用意するが、ホーム画面への追加は任意（ADR-0002）
+- `manifest`（`name`：毎度おおきに、`short_name`：毎度おおきに）とアイコンは用意するが、ホーム画面への追加は任意（ADR-0002）
 - Service Workerは、新しい版を、通信があるときに裏で取得し、次の起動で切り替える。イベント当日の朝にデプロイしない（運用）
 
 ## 9. 運用上の設計
