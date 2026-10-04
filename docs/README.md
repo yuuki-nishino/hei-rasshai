@@ -6,7 +6,7 @@
 | [DESIGN.md](./DESIGN.md) | 設計書（概要）。全体像、技術構成、アプリの構成、環境・デプロイ、進め方 |
 | [design/](./design/) | 詳細設計。下表のとおり、テーマごとに分ける |
 | [adr/](./adr/) | 設計判断の記録（Architecture Decision Record）。1判断につき1ファイル。`NNNN-題名.md` |
-| [reviews/](./reviews/) | レビューの結果と、それへの対応（採用・見送りの切り分けと理由）。`題名.md`（日付は、中に書く） |
+| [reviews/](./reviews/) | レビューの結果と、それへの対応（採用・見送りの切り分けと理由）。`題名.md`（日付は、中に書く）。依存の脆弱性（`npm audit`）への対応も、ここに記録する（[dependency-audit.md](./reviews/dependency-audit.md)） |
 
 ### design/
 | 文書 | 内容 |
