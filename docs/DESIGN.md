@@ -32,7 +32,7 @@
 | [design/screens.md](./design/screens.md) | 画面ごとの設計（データ・状態・操作・エラー・お客様画面） |
 | [design/testing.md](./design/testing.md) | テスト計画（ドメイン・ルール・結合・実機） |
 
-設計判断の記録：[ADR-0001 Preact](./adr/0001-use-preact.md)、[ADR-0002 PWAの範囲](./adr/0002-pwa-scope.md)、[ADR-0003 招待はメールアドレス宛て](./adr/0003-invite-by-email.md)
+設計判断の記録：[ADR-0001 Preact](./adr/0001-use-preact.md)、[ADR-0002 PWAの範囲](./adr/0002-pwa-scope.md)、[ADR-0003 招待はメールアドレス宛て](./adr/0003-invite-by-email.md)、[ADR-0004 「やめる」は墓標で排他する](./adr/0004-void-tombstone.md)
 
 ## 3. 技術構成
 
@@ -69,9 +69,12 @@ hei-rasshai/
 │  ├─ components/             # 共通部品（StatusBar, ConfirmDialog, Toast, BigButton …）
 │  ├─ state/                  # signals（認証・現在のイベント・接続状態・購読データ）
 │  └─ lib/
-│     ├─ firebase.ts          # 初期化（スタッフ用／お客様用）。Emulator接続
-│     ├─ data/                # auth, events, members, menu, orders, closings, errors
-│     └─ domain/              # day, summary, closing, bulkMenu, csv, order(遷移・計算), url
+│     ├─ firebase/
+│     │  ├─ staff.ts          # スタッフ用の初期化（Auth・永続キャッシュ）。Emulator接続
+│     │  └─ customer.ts       # お客様用の初期化（Firestoreのみ・メモリキャッシュ。firebase/auth を含めない）
+│     ├─ data/                # auth, events, members, menu, orders, closings, writes, errors
+│     │  └─ customerOrder.ts  # お客様用の watchOrder だけ（staff.ts を import しない）
+│     └─ domain/              # day, summary, closing, bulkMenu, csv, order(遷移・計算), confirmFlow, connection, customerView, url
 ├─ public/                    # アイコン、manifest（Service Worker導入時）
 ├─ docs/                      # SPEC.md, DESIGN.md, design/, adr/
 ├─ firestore.rules
@@ -86,7 +89,10 @@ hei-rasshai/
 - `firebase.json`：
   - rewrite：`/s` → `/customer.html`、その他 → `/index.html`
   - ヘッダー：`Referrer-Policy: same-origin`、`X-Content-Type-Options: nosniff`。Service Workerのファイルは、キャッシュしない（`Cache-Control: no-cache`）
-- ★ Service Workerのスコープと、`/s` の関係（お客様画面に影響しないこと。ナビゲーションのフォールバックから `/s` を除外する）
+  - **クリックジャッキング対策**：`Content-Security-Policy: frame-ancestors 'self'`（と、古いブラウザ向けに `X-Frame-Options: SAMEORIGIN`）。他のサイトから、画面を `iframe` で埋め込まれ、取り消しなどを押させられるのを防ぐ。`'none'` ではなく `'self'` にするのは、`authDomain` をHostingと同じドメインにしたとき、Firebase Authの `iframe`（同じドメインの `/__/auth/iframe`）を、阻害しないため
+  - CSP全体（`script-src` など）は、Firebase AuthとGoogleのスクリプト・Viteのインライン処理との兼ね合いが大きく、今回は見送る
+- ★W1 Service Workerのスコープと、`/s` の関係（お客様画面に影響しないこと。ナビゲーションのフォールバックから `/s` を除外する）
+- ★W2 `frame-ancestors 'self'` が、Googleログイン（popup / redirect、`authDomain` の `iframe`）に影響しないこと
 
 ## 5. 環境とデプロイ
 
@@ -104,7 +110,7 @@ hei-rasshai/
 2. Firestoreを作成（本番モード、`asia-northeast1`）
 3. Authenticationで、Googleログインを有効化。承認済みドメインに、Hostingのドメインを追加
 4. ウェブアプリを登録し、設定値を `.env` に入れる
-5. `creators/{許可するメールアドレス}` を、コンソールで作成する（最初は運営者自身）
+5. `creators/{許可するメールアドレス}` を、コンソールで作成する（最初は運営者自身）。**IDは小文字で登録する**（ルールは、ログイン中のメールを `lower()` にして比較するため、大文字を含むIDには一致しない）
 6. `firebase deploy --only firestore:rules,firestore:indexes,hosting`
 7. 当日までに、スタッフの端末でログインする（C2）
 
@@ -122,14 +128,15 @@ Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／
 
 | 画面 | 購読の方針 |
 |---|---|
-| 調理 | `status in ['preparing','ready']` のみを購読。済みの表示を出すときだけ、その日の全注文を追加で購読 |
+| 調理（と接続状態の判定） | `status in ['preparing','ready']` のみを、**イベントを選んでいる間は、Shell で常に購読**する（どのタブでも接続状態を判定するため）。済みの表示を出すときだけ、その日の全注文を追加で購読 |
 | 売上・レジ締め | 画面を開いたとき（と「更新」）に、その日の `day` で取得。常時購読はしない |
 | お客様 | 自分の1ドキュメントのみ購読（`onSnapshot`）。ポーリングは、読み取りが増えるため使わない |
 | メニュー | 全件購読（100件以下） |
 | イベント一覧 | コレクショングループで `members` を購読 → 各イベントを `get` |
 
 - 見積もり：1注文あたり、書き込み約5回（確定で2回、ステータス更新で約3回）。2万／日なら、全体で約4000注文／日まで。1イベント数百件なら、同時に10イベント程度まで余裕がある
-- 読み取りは、ルールの `exists` / `get` を含め、1操作あたり数回。想定規模では5万／日に収まる
+- 読み取りは、ルールの `exists` / `get` を含めて数える。注文の確定は、ルールの読み取りが、1件あたり最大5回程度（メンバー確認・墓標・カウンターの前後）、状態の更新は、1回程度。1イベント数百件なら、5万／日に収まる
+- 注文の `get` は、誰でもできるため、注文IDを知る人が、読み取りを繰り返すと、全イベント共通の枠を使い切れる（[security-rules.md](./design/security-rules.md) §6）。当面は、許容する
 - 複合インデックスが必要なクエリは書かない。調理画面の並べ替えなどは、クライアントで行う
 
 ## 8. オフラインとPWA
@@ -137,7 +144,9 @@ Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／
 - Firestoreのオフライン永続化を有効にする（`persistentLocalCache` + `persistentMultipleTabManager`）。**スタッフ側のみ**。お客様画面は、メモリキャッシュ
 - 注文の確定はトランザクション（通信必須）。ステータス変更は通常の書き込み（オフラインでも受け付け、復帰後に送られる）
 - 接続状態の表示：オンライン／オフライン／未送信◯件（判定方法は [design/data-access.md](./design/data-access.md) §6）
-- ステータス変更が溜まっている間に、別メンバーが同じ注文を変更した場合は、サーバー側のルール（遷移の検証）で、不正な遷移を拒否する。拒否されたら、スタッフに通知する
+- ステータス変更が溜まっている間に、別メンバーが同じ注文を変更した場合は、サーバー側のルール（遷移の検証）で、不正な遷移を拒否する。拒否されたら、スタッフに通知する（再読み込みをまたいだ拒否は、通知できない。既知の制約：[data-access.md](./design/data-access.md) §6.2）
+- 「未送信◯件」は、ローカルの書き込みの `Promise` を、アプリ側で数える（`hasPendingWrites` では、「渡した」「取り消し」の注文が、購読の範囲から外れて数えられないため）
+- ログアウト時と、メンバーでなくなったときは、端末のキャッシュ（IndexedDB）を消す（[data-access.md](./design/data-access.md) §8）
 - Service Worker：アプリ本体（HTML/JS/CSS）をキャッシュし、オフラインでも開けるようにする（他のアプリに切り替えて、Safariのタブが破棄されたあとの再読み込みに備える）。**開発中は入れず、マイルストーン7で独立した作業として足す**
 - `manifest`（`name`：へい、らっしゃい！、`short_name`：らっしゃい）とアイコンは用意するが、ホーム画面への追加は任意（ADR-0002）
 - Service Workerは、新しい版を、通信があるときに裏で取得し、次の起動で切り替える。イベント当日の朝にデプロイしない（運用）
@@ -156,7 +165,7 @@ Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／
 1. **土台**：Vite + TS + Preact、Firebase初期化（Emulator対応）、Googleログイン（★U1：Safariのタブで、popup / redirectを実機確認）、ルールとEmulatorテスト（メンバー制、招待、注文の更新制限）、`lib/domain` の骨組みとテスト
 2. **イベントとメンバー**：イベント作成、一覧、招待、参加、メンバー管理
 3. **メニュー管理**：追加・編集・並べ替え・売り切れ・まとめて追加
-4. **注文確定**：[order-confirm.md](./design/order-confirm.md) のフロー（採番、冪等性、タイムアウト、中止フラグ、確認、復元）。結合テストを書く
+4. **注文確定**：[order-confirm.md](./design/order-confirm.md) のフロー（採番、冪等性、タイムアウト、墓標、保留中の注文の復元）。確定フローのreducerと、結合テストを書く
 5. **調理画面とお客様画面**：状態遷移、QR、リアルタイム反映（お客様画面は別エントリ）
 6. **売上とレジ締め**：集計、CSV、締め、「締め後に変更あり」
 7. **オフライン対応と接続状態の表示**：Service Workerの導入（ADR-0002）、オフライン時の挙動、未送信件数。ホーム画面アプリでのログインを実機で確認し、追加を勧めるかを決める（★U1）
@@ -168,8 +177,9 @@ Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／
 |---|---|---|
 | U1 | Googleログイン（popup / redirect、`authDomain`）。Safariのタブはマイルストーン1、ホーム画面アプリは、追加を勧める前に確認 | マイルストーン1・7、実機 |
 | U4 | イベント削除（Cloud Functionsなしで、配下を消す）の件数・時間・中断時の動作 | マイルストーン8 |
-| R1〜R7 | ルールの検証項目（[security-rules.md](./design/security-rules.md) §5） | マイルストーン1・Emulator |
-| S1 | Service Workerと `/s` の関係（お客様画面に影響しないこと） | マイルストーン5・7 |
-| C1 | 確定フローの、16秒の待ち（SDKの内部の挙動に依存） | マイルストーン4 |
+| R1〜R11 | ルールの検証項目（[security-rules.md](./design/security-rules.md) §5）。**R8（墓標の排他）が、確定フローの安全性の要** | マイルストーン1・Emulator |
+| W1 | Service Workerと `/s` の関係（お客様画面に影響しないこと） | マイルストーン5・7 |
+| W2 | `frame-ancestors 'self'` が、Googleログインに影響しないこと | マイルストーン1・実機 |
+| F1 | お客様画面の初回JavaScriptが、gzip後200KB以下か（Firestore SDKの大きさ） | マイルストーン5 |
 | N1 | 接続状態の推定（`fromCache` が10秒続いたらオフライン）が、実機で、遅すぎ・早すぎないか | マイルストーン7 |
 | M1 | Gmailの別名・Workspaceのエイリアスで、招待のメールアドレスが一致しないときの扱い | マイルストーン2・実機 |

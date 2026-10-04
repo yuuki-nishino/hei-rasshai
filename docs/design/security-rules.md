@@ -7,10 +7,14 @@ Firestore のアクセス制御。データの定義は [data-model.md](./data-m
 
 - **アクセス権は、`events/{e}/members/{uid}` の存在で決まる**。アカウントの種類（許可リストなど）では決めない
 - イベントを作れるのは、`creators/{email}` に登録されたアカウントだけ（公開するときは、この条件を緩める）
-- メンバーになれるのは、**自分のメールアドレス宛ての、有効な招待がある人**だけ（[ADR-0003](../adr/0003-invite-by-email.md)）
+- メンバーになれるのは、**自分のメールアドレス宛ての、有効な招待がある人**だけ（[ADR-0003](../adr/0003-invite-by-email.md)）。参加と同時に招待が消えることを、ルールで強制する
 - お客様（未ログイン）は、**注文1件の取得（`get`）だけ**できる。一覧・検索はできない
-- 注文の `items` / `total` / `number` / `day` / `qr` / `createdBy` / `createdAt` は、作成後に誰も変更できない
+- 注文の `items` / `total` / `number` / `day` / `qr` / `createdBy` / `createdAt` は、作成後に誰も変更できない。作成時に、**項目の集合・型・初期値**も検証する（スタッフのメールなどを混ぜられない）
 - 注文の状態の遷移は、ルールでも検証する（不正な遷移を拒否）
+- 番号の一意性は、カウンターが「ちょうど1ずつ進む」ことと、注文が「そのカウンターの値で作られる」ことで、ルールが担保する
+- 「やめる」と遅れた注文の登録の競合は、**墓標（`voids`）**で、時間に頼らずに排他する（[ADR-0004](../adr/0004-void-tombstone.md)）
+- 注文は、**イベントの削除中以外は、削除できない**（`events.deleting` フラグ）
+- ルールは、**一致したものの OR** で判定される（優先順位はない）。そのため、サブコレクションごとに、明示的に `match` を書き、書いていないものは、すべて拒否する
 - ルールの `exists` / `get` は、1回ごとに、読み取り1回として数えられる
 
 ## 2. 権限表
@@ -20,16 +24,20 @@ Firestore のアクセス制御。データの定義は [data-model.md](./data-m
 | 注文1件の取得 | ○ | ○ | ○ | ○ |
 | 注文の一覧・検索 | × | × | ○ | ○ |
 | 注文の作成・状態/支払いの更新 | × | × | ○ | ○ |
-| 注文の削除 | × | × | × | ○（イベント削除のとき） |
-| メニュー・カウンター・レジ締めの読み書き | × | × | ○ | ○ |
+| 注文の削除 | × | × | × | ○（イベントの削除中のみ） |
+| 墓標（`voids`）の作成・取得 | × | × | ○ | ○ |
+| メニューの読み書き（削除を含む） | × | × | ○ | ○ |
+| カウンター・レジ締めの読み書き | × | × | ○（カウンターは+1のみ） | ○ |
+| カウンター・レジ締め・墓標の削除 | × | × | × | ○（イベントの削除中のみ） |
 | イベントの取得・更新 | × | × | ○ | ○ |
 | イベントの作成 | × | `creators` に登録済みなら○ | － | － |
-| イベントの削除 | × | × | × | ○ |
+| イベントの `deleting` の変更 | × | × | × | ○ |
+| イベントの削除 | × | × | × | ○（`deleting = true` のとき） |
 | メンバーの一覧 | × | × | ○ | ○ |
 | メンバーになる | × | 自分宛ての有効な招待があれば○ | － | － |
-| メンバーの削除 | × | × | 自分のみ（抜ける） | ○（誰でも） |
+| メンバーの削除 | × | × | 自分のみ（抜ける） | 他のメンバーのみ。**自分自身は、イベントの削除後のみ** |
 | 招待の作成・読み取り・更新 | × | × | × | ○ |
-| 招待の削除 | × | 自分宛てのみ（参加と同時） | 自分宛てのみ | ○ |
+| 招待の削除 | × | 自分宛てのみ（参加するときは、メンバーの作成と同じバッチで削除することを、ルールが強制する） | 自分宛てのみ | ○ |
 | 自分のイベント一覧（コレクショングループ） | × | 自分の `members` のみ | 同左 | 同左 |
 | `creators` | × | × | × | ×（コンソールのみ） |
 
@@ -40,20 +48,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ---------- 共通 ----------
     function signedIn() { return request.auth != null; }
-    function eventDoc(e) { return /databases/$(database)/documents/events/$(e); }
-    function isMember(e) {
-      return signedIn()
-          && exists(/databases/$(database)/documents/events/$(e)/members/$(request.auth.uid));
-    }
-    function isOwner(e) {
-      return signedIn() && get(eventDoc(e)).data.ownerUid == request.auth.uid;
-    }
+    function eventPath(e) { return /databases/$(database)/documents/events/$(e); }
+    function subPath(e, sub, id) { return /databases/$(database)/documents/events/$(e)/$(sub)/$(id); }
+    function myEmail() { return request.auth.token.email.lower(); }
+
+    function isMember(e) { return signedIn() && exists(subPath(e, 'members', request.auth.uid)); }
+    function isOwner(e)  { return signedIn() && get(eventPath(e)).data.ownerUid == request.auth.uid; }
+    function isDeleting(e) { return get(eventPath(e)).data.deleting == true; }
+
     function canCreateEvent() {
       return signedIn() && request.auth.token.email_verified
-          && exists(/databases/$(database)/documents/creators/$(request.auth.token.email));
+          && exists(/databases/$(database)/documents/creators/$(myEmail()));
       // 一般公開するときは、signedIn() だけにする（＋App Check）
     }
+
+    function validDay(d) { return d is string && d.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
+
     function okTransition(from, to) {
       return from == to
           || (from == 'preparing' && to in ['ready', 'cancelled'])
@@ -62,56 +74,139 @@ service cloud.firestore {
           || (from == 'cancelled' && to in ['preparing', 'ready', 'done']);
     }
 
+    function validEvent(d) {
+      return d.keys().hasOnly(['name', 'startDate', 'endDate', 'floatCash', 'ownerUid', 'deleting', 'createdAt'])
+          && d.name is string && d.name.size() >= 1 && d.name.size() <= 60
+          && validDay(d.startDate) && validDay(d.endDate) && d.startDate <= d.endDate
+          && d.floatCash is int && d.floatCash >= 0 && d.floatCash <= 10000000
+          && d.deleting is bool;
+    }
+
+    function validMenu(d) {
+      return d.keys().hasOnly(['name', 'price', 'order', 'soldOut'])
+          && d.name is string && d.name.size() >= 1 && d.name.size() <= 40
+          && d.price is int && d.price >= 1 && d.price <= 100000
+          && d.order is number && d.soldOut is bool;
+    }
+
+    function validClosing(d, day) {
+      return validDay(day)
+          && d.keys().hasOnly(['floatCash', 'expectedCash', 'actualCash', 'diff', 'note', 'closedAt', 'closedBy'])
+          && d.floatCash is int && d.floatCash >= 0
+          && d.expectedCash is int && d.actualCash is int && d.actualCash >= 0
+          && d.diff is int && d.diff == d.actualCash - d.expectedCash
+          && d.note is string && d.note.size() <= 200
+          && d.closedAt == request.time && d.closedBy == request.auth.uid;
+    }
+
+    // ---------- イベント ----------
     match /events/{eventId} {
       allow get: if isMember(eventId);
       allow create: if canCreateEvent()
+        && validEvent(request.resource.data)
         && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.name is string
-        && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 60;
+        && request.resource.data.deleting == false
+        && request.resource.data.createdAt == request.time;
       allow update: if isMember(eventId)
-        && request.resource.data.ownerUid == resource.data.ownerUid;
-      allow delete: if isOwner(eventId);
+        && validEvent(request.resource.data)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (request.resource.data.deleting == resource.data.deleting || isOwner(eventId));
+      allow delete: if isOwner(eventId) && resource.data.deleting == true;
 
+      // ---------- メンバー ----------
       match /members/{uid} {
         allow get, list: if isMember(eventId);
         allow create: if signedIn() && request.auth.uid == uid
           && request.resource.data.keys().hasOnly(['uid', 'role', 'displayName', 'email', 'joinedAt'])
           && request.resource.data.uid == uid
+          && request.resource.data.email == myEmail()
+          && request.resource.data.joinedAt == request.time
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() <= 60
           && (
             // オーナー：イベントと同じバッチで作る
             (request.resource.data.role == 'owner'
-              && getAfter(eventDoc(eventId)).data.ownerUid == uid)
-            // メンバー：自分のメールアドレス宛ての、有効な招待がある
+              && getAfter(eventPath(eventId)).data.ownerUid == uid)
+            // メンバー：自分のメールアドレス宛ての有効な招待があり、同じバッチで招待が削除される
             || (request.resource.data.role == 'member'
               && request.auth.token.email_verified
-              && exists(/databases/$(database)/documents/events/$(eventId)/invites/$(request.auth.token.email))
-              && get(/databases/$(database)/documents/events/$(eventId)/invites/$(request.auth.token.email)).data.expiresAt > request.time)
+              && exists(subPath(eventId, 'invites', myEmail()))
+              && request.time < get(subPath(eventId, 'invites', myEmail())).data.createdAt + duration.value(1, 'd')
+              && !existsAfter(subPath(eventId, 'invites', myEmail())))
           );
         allow update: if false;
-        allow delete: if isOwner(eventId) || (signedIn() && request.auth.uid == uid);
+        allow delete: if signedIn() && (
+          // オーナーが、他のメンバーを削除する
+          (isOwner(eventId) && uid != request.auth.uid)
+          // 本人が抜ける。ただし、オーナー自身は、イベントが無くなった後（削除の最後・孤立の掃除）だけ
+          || (request.auth.uid == uid
+              && (!exists(eventPath(eventId)) || get(eventPath(eventId)).data.ownerUid != uid))
+        );
       }
 
+      // ---------- 招待（有効期限は createdAt から1日。ルールが計算する） ----------
       match /invites/{email} {
-        allow read, create, update: if isOwner(eventId);
+        allow read: if isOwner(eventId);
+        allow create, update: if isOwner(eventId)
+          && email == email.lower() && email.matches('^[^@]+@[^@]+$')
+          && request.resource.data.keys().hasOnly(['createdBy', 'createdAt'])
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time;
         // オーナーが取り消す。招待された本人は、参加と同時に使い切る
         allow delete: if isOwner(eventId)
-          || (signedIn() && request.auth.token.email == email);
+          || (signedIn() && request.auth.token.email_verified && myEmail() == email);
       }
 
+      // ---------- 墓標（「やめる」で、その注文IDを以後使えなくする） ----------
+      match /voids/{orderId} {
+        allow get: if isMember(eventId);
+        allow create: if isMember(eventId)
+          && !exists(subPath(eventId, 'orders', orderId))
+          && request.resource.data.keys().hasOnly(['createdBy', 'createdAt'])
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time;
+        allow update: if false;
+        allow delete: if isOwner(eventId) && isDeleting(eventId);
+      }
+
+      // ---------- 注文 ----------
       match /orders/{orderId} {
         // お客様：注文IDを知っている人が、その1件だけ読める（一覧は不可）
         allow get: if true;
         allow list: if isMember(eventId);
+
         allow create: if isMember(eventId)
+          && !exists(subPath(eventId, 'voids', orderId))
+          && request.resource.data.keys().hasOnly(
+               ['number', 'day', 'items', 'total', 'payment', 'status', 'cancelledFrom', 'qr',
+                'createdAt', 'readyAt', 'doneAt', 'cancelledAt', 'createdBy', 'updatedBy', 'updatedAt'])
           && request.resource.data.createdBy == request.auth.uid
           && request.resource.data.updatedBy == request.auth.uid
-          && request.resource.data.status in ['preparing', 'done']
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time
           && request.resource.data.payment in ['cash', 'paypay']
           && request.resource.data.number is int && request.resource.data.number >= 1
-          && request.resource.data.total is int && request.resource.data.total >= 0
+          && validDay(request.resource.data.day)
+          && request.resource.data.total is int && request.resource.data.total >= 1
           && request.resource.data.items is list
           && request.resource.data.items.size() >= 1 && request.resource.data.items.size() <= 50
-          && request.resource.data.day is string && request.resource.data.day.size() == 10;
+          && request.resource.data.qr is bool
+          && request.resource.data.cancelledFrom == null
+          && request.resource.data.readyAt == null
+          && request.resource.data.cancelledAt == null
+          // QRあり → 調理中。QRなし → 確定と同時に渡し済み
+          && ((request.resource.data.status == 'preparing' && request.resource.data.qr == true
+                 && request.resource.data.doneAt == null)
+              || (request.resource.data.status == 'done' && request.resource.data.qr == false
+                 && request.resource.data.doneAt == request.time))
+          // 番号：カウンターが、同じ書き込みで、ちょうど1だけ進み、その値が number になる
+          && (exists(subPath(eventId, 'counters', request.resource.data.day))
+                ? get(subPath(eventId, 'counters', request.resource.data.day)).data.n : 0)
+               == request.resource.data.number - 1
+          && getAfter(subPath(eventId, 'counters', request.resource.data.day)).data.n
+               == request.resource.data.number;
+
         // 作成後に変えられるのは、状態・支払い方法・時刻・更新者だけ
         allow update: if isMember(eventId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
@@ -119,22 +214,57 @@ service cloud.firestore {
                 'cancelledAt', 'updatedBy', 'updatedAt'])
           && request.resource.data.payment in ['cash', 'paypay']
           && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedAt == request.time
           && okTransition(resource.data.status, request.resource.data.status)
-          // 取り消しを戻すときは、取り消し前の状態に戻す
-          && (resource.data.status != 'cancelled'
-              || request.resource.data.status == 'cancelled'
-              || request.resource.data.status == resource.data.cancelledFrom)
+          // 取り消し以外の状態では、cancelledFrom は null
+          && (request.resource.data.status == 'cancelled' || request.resource.data.cancelledFrom == null)
           // 取り消すときは、直前の状態を cancelledFrom に残す
-          && (request.resource.data.status != 'cancelled'
-              || resource.data.status == 'cancelled'
-              || request.resource.data.cancelledFrom == resource.data.status);
-        allow delete: if isOwner(eventId);   // イベント削除のときだけ
+          && (request.resource.data.status != 'cancelled' || resource.data.status == 'cancelled'
+              || request.resource.data.cancelledFrom == resource.data.status)
+          // 取り消しを戻すときは、取り消し前の状態に戻す
+          && (resource.data.status != 'cancelled' || request.resource.data.status == 'cancelled'
+              || request.resource.data.status == resource.data.cancelledFrom)
+          // 取り消し中のままの更新（支払い方法の変更など）では、cancelledFrom を変えない
+          && (request.resource.data.status != 'cancelled' || resource.data.status != 'cancelled'
+              || request.resource.data.cancelledFrom == resource.data.cancelledFrom)
+          // 時刻は、null・今・変更なし のいずれか
+          && (request.resource.data.readyAt == null || request.resource.data.readyAt == request.time
+              || request.resource.data.readyAt == resource.data.readyAt)
+          && (request.resource.data.doneAt == null || request.resource.data.doneAt == request.time
+              || request.resource.data.doneAt == resource.data.doneAt)
+          && (request.resource.data.cancelledAt == null || request.resource.data.cancelledAt == request.time
+              || request.resource.data.cancelledAt == resource.data.cancelledAt);
+
+        // イベントの削除中だけ
+        allow delete: if isOwner(eventId) && isDeleting(eventId);
       }
 
-      match /{sub}/{doc=**} {
-        // menu, counters, closings
-        allow read, write: if isMember(eventId) && sub in ['menu', 'counters', 'closings'];
+      // ---------- メニュー ----------
+      match /menu/{menuId} {
+        allow read: if isMember(eventId);
+        allow create, update: if isMember(eventId) && validMenu(request.resource.data);
+        allow delete: if isMember(eventId);
       }
+
+      // ---------- 採番カウンター ----------
+      match /counters/{day} {
+        allow read: if isMember(eventId);
+        allow create: if isMember(eventId) && validDay(day)
+          && request.resource.data.keys().hasOnly(['n']) && request.resource.data.n == 1;
+        allow update: if isMember(eventId)
+          && request.resource.data.keys().hasOnly(['n'])
+          && request.resource.data.n == resource.data.n + 1;
+        allow delete: if isOwner(eventId) && isDeleting(eventId);
+      }
+
+      // ---------- レジ締め ----------
+      match /closings/{day} {
+        allow read: if isMember(eventId);
+        allow create, update: if isMember(eventId) && validClosing(request.resource.data, day);
+        allow delete: if isOwner(eventId) && isDeleting(eventId);
+      }
+
+      // 上に書いていないサブコレクションは、すべて拒否される
     }
 
     // 自分のイベント一覧用（コレクショングループ）
@@ -147,44 +277,62 @@ service cloud.firestore {
 }
 ```
 
+### ルールで担保できないこと
+- `items` の**各行の中身**（`menuId`・`price`・`qty` の型・範囲）と、`total` との一致：ルールには、リストを繰り返し検査する構文がない。`total` が1以上の整数であることと、行数だけを検査する
+- 注文を作らずに、カウンターだけを進めること（番号が欠ける。重複はしない）
+- メニューが100件を超えること：クライアントで制限する
+- 1日（`day`）を、端末の日付と一致させること：メンバーを信頼する
+
 ## 4. 参加・招待・イベント作成の流れ
 
 ### イベント作成（1バッチ）
-1. `events/{eventId}` を作成（`ownerUid = 自分のuid`）
+1. `events/{eventId}` を作成（`ownerUid = 自分のuid`、`deleting = false`、`createdAt = serverTimestamp`）
 2. `events/{eventId}/members/{uid}` を作成（`role = 'owner'`）
 - ルールは、`canCreateEvent()` と、`getAfter` による `ownerUid` の一致を検証する
 
 ### 招待（オーナー）
 1. 相手のGoogleメールアドレス（小文字）を入力
-2. `invites/{email}` を作成（`expiresAt = 1日後`）
+2. `invites/{email}` を作成（`createdBy`、`createdAt = serverTimestamp`）。**有効期限は、`createdAt` の1日後**（ルールが参加時に計算するため、期限の項目は持たない）
 3. 画面にリンク `{origin}/join?e={eventId}` を表示。コピーして、相手に送る
-- 再発行：同じ `invites/{email}` を、`expiresAt` を更新して上書きする
+- 再発行：同じ `invites/{email}` の `createdAt` を、`serverTimestamp` で更新する（期限が、その時点から1日になる）
 - 取り消し：`invites/{email}` を削除する
 
 ### 参加（招待された人）
-1. リンクを開く → 未ログインなら、Googleでログイン
-2. 1バッチで、`members/{自分のuid}` を作成（`role = 'member'`）し、`invites/{自分のメール}` を削除
-3. ルールが、自分のメールアドレス宛ての有効な招待があることを検証する
-4. 失敗（`permission-denied`）したときは、「このアカウント（{メール}）は、このイベントに招待されていません。招待されたアカウントでログインし直してください」と表示する
+1. リンクを開く → 未ログインなら、Googleでログイン（`prompt: 'select_account'`）
+2. すでにメンバーか確認する（`members/{自分のuid}` を `get`）。メンバーなら、そのイベントを選択して終了
+3. 1バッチで、`members/{自分のuid}` を作成（`role = 'member'`）し、`invites/{自分のメール}` を削除する
+4. ルールが、自分のメールアドレス宛ての有効な招待があることと、**同じバッチで招待が削除されること**（`!existsAfter`）を検証する
+5. 失敗（`permission-denied`）したときは、「このアカウント（{メール}）では、このイベントに参加できません。招待されたアカウントでログインし直してください。招待の期限（発行から1日）が切れている場合は、オーナーに再発行を頼んでください」と表示する
 
 ### メンバーの削除・抜ける
-- オーナー：`members/{uid}` を削除。メンバー：自分の `members/{自分のuid}` を削除（抜ける）
-- 削除された人の、画面の購読は `permission-denied` になる。→ イベント一覧に戻す
+- オーナー：他のメンバーの `members/{uid}` を削除。メンバー：自分の `members/{自分のuid}` を削除（抜ける）。**オーナーは抜けられない**（イベントの削除のみ）
+- 削除された人の、画面の購読は `permission-denied` になる。→ イベント一覧に戻す。端末のキャッシュも消す（[data-access.md](./data-access.md) §8）
+
+### イベントの削除
+1. オーナーが、`events/{eventId}.deleting = true` にする
+2. 配下を削除する（順序は [data-access.md](./data-access.md) §7）。注文・カウンター・レジ締め・墓標の削除は、`deleting = true` のときだけ許可される
+3. イベントを削除し、最後に、自分の `members` を削除する（イベントが無くなった後は、ルールが許可する）
 
 ## 5. ★検証項目（Emulator）
 
 | # | 内容 |
 |---|---|
-| R1 | 参加時の「メンバー作成＋招待の削除」バッチで、メンバー作成のルールが、削除前の招待を読めること（`get` / `exists` は、バッチ前の状態を見る） |
-| R2 | イベント作成バッチの `getAfter(eventDoc).data.ownerUid` が、同じバッチのイベント作成を参照できること |
+| R1 | 参加時の「メンバー作成＋招待の削除」バッチで、メンバー作成のルールが、削除前の招待を `get` / `exists` で読めること、`existsAfter` が `false` になること。招待を削除しないバッチは拒否されること |
+| R2 | イベント作成バッチの `getAfter(eventPath).data.ownerUid` が、同じバッチのイベント作成を参照できること |
 | R3 | コレクショングループのルール（`/{path=**}/members/{uid}`）が、個別の `members` のルールと、意図どおりに両立すること |
-| R4 | `/{sub}/{doc=**}` が、`orders` / `members` / `invites` に影響しないこと（個別の `match` が優先され、他は拒否されること） |
-| R5 | 招待のID（メールアドレス。`@` と `.` を含む）が、ルールのパスで使えること |
+| R4 | **ルールは一致したものの OR で判定される**ことを前提に、未知のサブコレクション（`events/{e}/foo/x`）への読み書きが、拒否されること |
+| R5 | 招待のID（メールアドレス。`@` と `.` を含む）が、パスで使えること。`lower()`・`matches()` が意図どおりに動くこと |
 | R6 | `resource.data.cancelledFrom` が `null` のときの比較が、意図どおりに動くこと |
 | R7 | `diff().affectedKeys()` が、値が変わらない項目（例：`readyAt` が `null` のまま）を含まないこと |
+| R8 | **墓標の排他**：「`voids` を作成 → 注文の作成」と「注文を作成 → `voids` の作成」の、両方の順序で、後の書き込みが拒否されること。同じ `orderId` で、注文を作るトランザクションと、`voids` を作るトランザクションが、競合したときに、どちらか一方だけが成功すること。**ただし、Emulatorは、本番と同じ並行性を再現するとは限らない**。安全性の本質は、「順序の2ケース」と、「コミット時にルールが評価されること＋読み取った文書の前提条件」にある。競合のテストは、補助的な確認とする |
+| R9 | 番号のルール：`exists(...) ? get(...).data.n : 0` の三項演算子、トランザクション内の `getAfter`（カウンターを進めない注文の作成が拒否されること、同じ番号の2件目が拒否されること） |
+| R10 | 文字列の比較（`startDate <= endDate`）、`timestamp + duration` の比較が、意図どおりに動くこと |
+| R11 | `request.time` と `serverTimestamp()` の一致（バッチ・トランザクション内、およびオフラインで溜めた更新が、後から届いたとき） |
 
-## 6. 公開時の追加対策（U5）
+## 6. 想定するリスクと、公開時の追加対策
 
-- `canCreateEvent()` を緩める前に、App Check を導入する
-- 無料枠の使用量の確認（Firebaseコンソール）の運用を決める
-- 招待・イベント作成の頻度の制限は、ルールでは難しいため、公開時に別途検討する
+- **注文の `get` は誰でもできる**ため、注文IDを知る人が、読み取りを繰り返すと、**全イベント共通の無料枠**（読み取り5万／日）を使い切れる（SPEC 7.2）。注文IDは、推測できない20文字なので、実際に行えるのは、QRを持つ人だけ。当面は、許容する
+- 一般公開の前（U5）：
+  - `canCreateEvent()` を緩める前に、App Check を導入する。**お客様画面にも**導入を検討する
+  - 無料枠の使用量の確認（Firebaseコンソール）の運用を決める
+  - 招待・イベント作成の頻度の制限は、ルールでは難しいため、別途検討する
