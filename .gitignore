@@ -1,0 +1,23 @@
+# 依存・ビルド
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# 環境変数（Firebaseの設定値など。リポジトリには入れない）
+.env
+.env.*
+!.env.example
+
+# Firebase
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# ログ・OS・エディタ
+npm-debug.log*
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/

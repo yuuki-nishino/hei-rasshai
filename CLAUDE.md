@@ -44,13 +44,16 @@ Issue（1PR分）→ ブランチ → 実装・テスト → PR（Closes #番号
 
 | コマンド | 内容 |
 |---|---|
-| `npm run dev` | 開発サーバー（`VITE_USE_EMULATOR=true` でEmulatorに接続） |
-| `npm run build` | ビルド |
-| `npm test` | 単体テスト（Vitest） |
+| `npm run dev` | 開発サーバー（`VITE_USE_EMULATOR=true` でEmulatorに接続）。スタッフ用は `/`、お客様用は `/customer.html` |
+| `npm run build` | 型チェック ＋ ビルド（`dist/`） |
+| `npm run typecheck` | 型チェック（`tsc -b`） |
+| `npm run lint` | Lint（ESLint。レイヤーの依存の向きも検査する） |
+| `npm test` | 単体テスト（Vitest。`test/domain`） |
 | `firebase emulators:start` | Auth・Firestoreのエミュレータ |
 | `firebase deploy -P dev` | devへのデプロイ |
 
-（プロジェクトの初期化後に、実際のスクリプト名に合わせて、更新する）
+- Node.js は 24（`.nvmrc`）
+- CI（`.github/workflows/ci.yml`）は、PRとmainへのpushで、型・Lint・単体テスト・ビルドを実行する
 
 ## 作業の進め方
 
