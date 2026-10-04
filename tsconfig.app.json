@@ -20,5 +20,5 @@
     "noUncheckedIndexedAccess": true,
     "erasableSyntaxOnly": true
   },
-  "include": ["src", "test"]
+  "include": ["src"]
 }

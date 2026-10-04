@@ -51,11 +51,13 @@ Issue（1PR分）→ ブランチ → 実装・テスト → PR（Closes #番号
 | `npm run build:dev` | 同上（devの設定値。`.env.development`）。devへのデプロイの前に使う |
 | `npm run typecheck` | 型チェック（`tsc -b`） |
 | `npm run lint` | Lint（ESLint。レイヤーの依存の向きも検査する） |
-| `npm test` | 単体テスト（Vitest。`test/domain`） |
+| `npm test` | 単体テスト ＋ ルールのテスト |
+| `npm run test:unit` | 単体テスト（Vitest。`test/domain`） |
+| `npm run test:rules` | ルールのテスト（`test/rules`。Firestore Emulatorを起動して実行。Java 21 以上が必要） |
 | `npx firebase deploy -P dev` | devへのデプロイ（Firebase CLIは devDependencies に入っている） |
 
 - Node.js は 24（`.nvmrc`）
-- CI（`.github/workflows/ci.yml`）は、PRとmainへのpushで、型・Lint・単体テスト・ビルドを実行する
+- CI（`.github/workflows/ci.yml`）は、PRとmainへのpushで、型・Lint・単体テスト・ルールのテスト・ビルドを実行する
 
 ## 作業の進め方
 

@@ -38,7 +38,15 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['test/domain/**/*.test.ts', 'src/**/*.test.ts'],
     environment: 'node',
+    projects: [
+      // 単体テスト（Firebase に依存しない）
+      { extends: true, test: { name: 'unit', include: ['test/domain/**/*.test.ts', 'src/**/*.test.ts'] } },
+      // ルールのテスト（Firestore Emulator が必要。npm run test:rules が、Emulator を起動して実行する）
+      {
+        extends: true,
+        test: { name: 'rules', include: ['test/rules/**/*.test.ts'], fileParallelism: false, testTimeout: 20000, hookTimeout: 20000 },
+      },
+    ],
   },
 });

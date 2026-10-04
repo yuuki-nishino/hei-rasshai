@@ -13,10 +13,12 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "eslint .",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "npm run test:unit && npm run test:rules",
+    "test:watch": "vitest --project unit",
     "emulators": "firebase emulators:start --project demo-maido-ookini",
-    "build:dev": "tsc -b && node scripts/build.mjs development"
+    "build:dev": "tsc -b && node scripts/build.mjs development",
+    "test:unit": "vitest run --project unit",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-maido-ookini \"vitest run --project rules\""
   },
   "dependencies": {
     "@preact/signals": "^2.11.3",
@@ -25,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@preact/preset-vite": "^2.10.6",
     "@types/node": "^26.6.4",
     "eslint": "^10.12.0",
