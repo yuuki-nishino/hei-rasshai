@@ -210,6 +210,56 @@ describe('自分のイベント一覧（コレクショングループ）', () =
     await assertFails(getDocs(query(collection(as(env, BOB), 'events/e1/members'), where('uid', '==', ALICE))));
   });
 
+  // ↓ 上のルールの抜け道を、攻撃する側の目線で確かめる（R3）
+  // Firestore のルールは「フィルターではない」：条件だけで、読めない文書が混ざらないと証明できない検索は、丸ごと拒否される
+  describe('R3：非メンバーが、自分の uid の条件を足して、他人の情報を引き出せないこと', () => {
+    const members = () => collection(as(env, BOB), 'events/e1/members');
+
+    it.each([
+      ['in に他人の uid を混ぜる', () => query(members(), where('uid', 'in', [BOB, ALICE]))],
+      ['!= で自分以外を探す', () => query(members(), where('uid', '!=', BOB))],
+      ['範囲（>=）で探す', () => query(members(), where('uid', '>=', ''))],
+      ['uid 以外の項目で探す', () => query(members(), where('role', '==', 'owner'))],
+      ['メールで探す', () => query(members(), where('email', '==', emailOf(ALICE)))],
+      ['条件なし', () => query(members())],
+    ])('%s → 拒否', async (_label, q) => {
+      await assertFails(getDocs(q()));
+    });
+
+    it('自分の uid に、別の条件を足しても、結果は自分の文書だけ（非メンバーなら空）', async () => {
+      const snap = await assertSucceeds(
+        getDocs(query(members(), where('uid', '==', BOB), where('role', '==', 'owner'))),
+      );
+      if (!snap.empty) throw new Error('非メンバーに、文書が返った');
+    });
+
+    it('存在しないイベントでも、存在するイベントでも、同じく空（イベントの有無は分からない）', async () => {
+      const db = as(env, BOB);
+      const a = await assertSucceeds(getDocs(query(collection(db, 'events/e1/members'), where('uid', '==', BOB))));
+      const b = await assertSucceeds(getDocs(query(collection(db, 'events/nope/members'), where('uid', '==', BOB))));
+      if (!a.empty || !b.empty) throw new Error('空でない');
+    });
+
+    it('他人の members を1件ずつ get することはできない（このルールは list だけ）', async () => {
+      await assertFails(getDoc(doc(as(env, BOB), 'events/e1/members', ALICE)));
+    });
+
+    it('メンバーから外された人には、外されたイベントの members は返らない', async () => {
+      await deleteDoc(doc(as(env, OWNER), 'events/e1/members', ALICE));
+      const snap = await assertSucceeds(
+        getDocs(query(collectionGroup(as(env, ALICE), 'members'), where('uid', '==', ALICE))),
+      );
+      if (!snap.empty) throw new Error('外されたイベントの members が返った');
+    });
+
+    it('どこの members にも、文書を書き込めない（このルールは list だけ）', async () => {
+      const db = as(env, BOB);
+      await assertFails(setDoc(doc(db, 'members', BOB), { uid: BOB }));
+      await assertFails(setDoc(doc(db, 'foo/x/members', BOB), { uid: BOB }));
+      await assertFails(setDoc(doc(db, 'events/e1/members', ALICE, 'members', BOB), { uid: BOB }));
+    });
+  });
+
   it('未ログインは list できない', async () => {
     await assertFails(getDocs(query(collectionGroup(anon(env), 'members'), where('uid', '==', ALICE))));
   });
