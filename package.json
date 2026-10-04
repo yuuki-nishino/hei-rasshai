@@ -8,15 +8,19 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev:emu": "vite --mode emulator",
+    "build": "tsc -b && node scripts/build.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "emulators": "firebase emulators:start --project demo-maido-ookini",
+    "build:dev": "tsc -b && node scripts/build.mjs development"
   },
   "dependencies": {
     "@preact/signals": "^2.11.3",
+    "firebase": "^12.19.0",
     "preact": "^11.0.0"
   },
   "devDependencies": {
@@ -25,6 +29,7 @@
     "@types/node": "^26.6.4",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "firebase-tools": "^15.32.1",
     "globals": "^17.13.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.0",

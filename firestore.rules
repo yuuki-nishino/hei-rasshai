@@ -1,0 +1,10 @@
+rules_version = '2';
+
+// 仮のルール：すべて拒否する。本来のルールは #3・#4 で足す（design/security-rules.md）
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

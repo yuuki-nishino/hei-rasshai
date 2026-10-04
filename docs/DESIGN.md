@@ -85,7 +85,10 @@ maido-ookini/
 ```
 
 ### 4.3 ビルドとホスティング
-- Vite のマルチページ構成（`index.html`、`customer.html`）。お客様用エントリは、Auth・スタッフ画面・QR生成・Service Workerを含めない
+- Vite で、`index.html`（スタッフ用）と `customer.html`（お客様用）を、**別々にビルドする**（`npm run build` が、スタッフ用 → お客様用の順に、同じ `dist/` へ出力する）。お客様用エントリは、Auth・スタッフ画面・QR生成・Service Workerを含めない
+  - 1回のビルドで2つのエントリを作る（マルチページ構成）と、Firestore SDK が共有チャンクになり、スタッフ用の永続キャッシュ（IndexedDB）のコードが、お客様用にも読み込まれる（#2で確認。gzip後 162KB → 分けると 136KB）。そのため、ビルドを分ける
+  - お客様用のビルドは、`@firebase/auth`・`src/staff/`・`lib/firebase/staff.ts`・永続キャッシュのコードが含まれていたら、失敗させる（`vite.config.ts` の `customerBundleGuard`）
+  - 開発サーバー（`npm run dev`）は、両方のHTMLを配信する（`/` と `/customer.html`。`/s` の rewrite は Hosting のみ）
 - `firebase.json`：
   - rewrite：`/s` → `/customer.html`、その他 → `/index.html`
   - ヘッダー：`Referrer-Policy: same-origin`、`X-Content-Type-Options: nosniff`。Service Workerのファイルは、キャッシュしない（`Cache-Control: no-cache`）
@@ -102,8 +105,10 @@ maido-ookini/
 | 開発用プロジェクト（`maido-ookini-dev`） | **実機での確認**（Googleログインは、実際のFirebaseが必要。Hostingのプレビューチャンネルで配信） | Spark |
 | 本番 | イベントで使う | Spark（`maido-ookini`） |
 
-- 設定値は `.env.*` の `VITE_FIREBASE_*`。`VITE_USE_EMULATOR=true` のときだけ、Emulatorに接続する。Firebaseの設定値は、秘密ではないが、リポジトリには入れない（`.env` はgit管理外）
-- コマンド：`npm run dev` / `npm run build` / `npm test` / `firebase emulators:start`
+- 設定値は `.env.*` の `VITE_FIREBASE_*`（項目は `.env.example`）。`VITE_USE_EMULATOR=true` のときだけ、Emulatorに接続する。Firebaseの設定値は、秘密ではないが、リポジトリには入れない（`.env.development`・`.env.production` はgit管理外）
+- Emulator用の `.env.emulator` だけは、git管理する。プロジェクトIDを `demo-maido-ookini`（`demo-` で始まるIDは、実在のプロジェクトに接続しない）にし、秘密を含まないため。Firebaseのプロジェクトがなくても、ローカルで開発できる
+- `.firebaserc`：`dev` → `maido-ookini-dev`、`prod` → `maido-ookini`。`default` は dev（誤って本番にデプロイしないため）
+- コマンド：`npm run dev`（dev の Firebase）/ `npm run dev:emu`（Emulator）/ `npm run emulators` / `npm run build`（本番の設定値）/ `npm run build:dev`（dev の設定値）/ `npm test`
 
 ### セットアップ手順（本番・開発用とも）
 1. Firebaseプロジェクトを作成（Sparkプラン。IDの空きを確認）
@@ -180,6 +185,6 @@ Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／
 | R1〜R11 | ルールの検証項目（[security-rules.md](./design/security-rules.md) §5）。**R8（墓標の排他）が、確定フローの安全性の要** | マイルストーン1・Emulator |
 | W1 | Service Workerと `/s` の関係（お客様画面に影響しないこと） | マイルストーン5・7 |
 | W2 | `frame-ancestors 'self'` が、Googleログインに影響しないこと | マイルストーン1・実機 |
-| F1 | お客様画面の初回JavaScriptが、gzip後200KB以下か（Firestore SDKの大きさ） | マイルストーン5 |
+| F1 | お客様画面の初回JavaScriptが、gzip後200KB以下か（Firestore SDKの大きさ）。#2の時点で、Preact＋Firestore（メモリキャッシュ・`getDoc` 1回）で、約137KB | マイルストーン5 |
 | N1 | 接続状態の推定（`fromCache` が10秒続いたらオフライン）が、実機で、遅すぎ・早すぎないか | マイルストーン7 |
 | M1 | Gmailの別名・Workspaceのエイリアスで、招待のメールアドレスが一致しないときの扱い | マイルストーン2・実機 |
