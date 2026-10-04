@@ -44,13 +44,15 @@ Issue（1PR分）→ ブランチ → 実装・テスト → PR（Closes #番号
 
 | コマンド | 内容 |
 |---|---|
-| `npm run dev` | 開発サーバー（`VITE_USE_EMULATOR=true` でEmulatorに接続）。スタッフ用は `/`、お客様用は `/customer.html` |
-| `npm run build` | 型チェック ＋ ビルド（`dist/`） |
+| `npm run dev` | 開発サーバー（devのFirebase。`.env.development` が必要）。スタッフ用は `/`、お客様用は `/customer.html` |
+| `npm run dev:emu` | 開発サーバー（Emulatorに接続。`.env.emulator`。先に `npm run emulators`） |
+| `npm run emulators` | Auth・Firestore・HostingのEmulator（`demo-maido-ookini`。UIは http://127.0.0.1:4000 、Hostingは `dist/` を :5002 で配信） |
+| `npm run build` | 型チェック ＋ ビルド（本番の設定値。スタッフ用・お客様用を別々に、`dist/` へ） |
+| `npm run build:dev` | 同上（devの設定値。`.env.development`）。devへのデプロイの前に使う |
 | `npm run typecheck` | 型チェック（`tsc -b`） |
 | `npm run lint` | Lint（ESLint。レイヤーの依存の向きも検査する） |
 | `npm test` | 単体テスト（Vitest。`test/domain`） |
-| `firebase emulators:start` | Auth・Firestoreのエミュレータ |
-| `firebase deploy -P dev` | devへのデプロイ |
+| `npx firebase deploy -P dev` | devへのデプロイ（Firebase CLIは devDependencies に入っている） |
 
 - Node.js は 24（`.nvmrc`）
 - CI（`.github/workflows/ci.yml`）は、PRとmainへのpushで、型・Lint・単体テスト・ビルドを実行する

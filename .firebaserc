@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "maido-ookini-dev",
+    "dev": "maido-ookini-dev",
+    "prod": "maido-ookini"
+  }
+}
