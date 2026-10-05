@@ -46,7 +46,7 @@
 | 認証 | Firebase Authentication（Googleのみ）。★U1 |
 | ホスティング | Firebase Hosting（無料） |
 | Firebase SDK | modular SDK（`firebase/app`, `firebase/auth`, `firebase/firestore`） |
-| QR生成 | `qrcode-generator` などの軽量ライブラリ（クライアント側。スタッフ側のみ） |
+| QR生成 | `qrcode-generator`（MIT。#13 で採用。SVG を作り、画像として表示する。スタッフ側のみ。`components/QrCode.tsx`） |
 | テスト | Vitest、Firebase Emulator Suite、`@firebase/rules-unit-testing` |
 
 ## 4. アプリの構成

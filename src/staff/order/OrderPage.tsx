@@ -20,7 +20,18 @@ import {
   setTendered,
   tenderedText,
 } from '../../state/cart';
+import { currentUser } from '../../state/auth';
+import {
+  abandonConfirm,
+  closeConfirm,
+  confirmState,
+  recheckConfirm,
+  resubmitWithNewId,
+  retryConfirm,
+  startConfirm,
+} from '../../state/confirm';
 import { useMenu } from '../../state/menu';
+import { ConfirmFlowDialog } from './ConfirmFlowDialog';
 import styles from './OrderPage.module.css';
 
 const QUICK = [1000, 5000, 10000] as const;
@@ -29,6 +40,7 @@ export function OrderPage({ eventId }: { eventId: string }) {
   const { items, error } = useMenu(eventId);
   const [message, setMessage] = useState<string | null>(null);
   const lines = cartLines.value;
+  const uid = currentUser.value?.uid;
 
   if (error && !items) return <ErrorView title="メニューを読み込めませんでした" />;
   if (!items) return <Loading label="メニューを読み込み中…" />;
@@ -70,12 +82,28 @@ export function OrderPage({ eventId }: { eventId: string }) {
 
       <Options />
 
-      <Footer
-        onConfirm={() => {
-          // 確定の処理（採番・冪等・タイムアウト）は #13 で足す
-          setMessage('確定の処理は、次の更新で使えるようになります');
-        }}
-      />
+      {confirmState.value.kind === 'idle' && confirmState.value.notice === 'voided' && (
+        <p class={styles.voidedNotice} role="status">
+          前の注文は、やめた扱いにしました（登録されていません）。カートは、そのまま残っています
+          <button type="button" class={styles.noticeButton} onClick={closeConfirm}>
+            閉じる
+          </button>
+        </p>
+      )}
+
+      <Footer onConfirm={() => uid && startConfirm(eventId, uid)} />
+
+      {uid && (
+        <ConfirmFlowDialog
+          state={confirmState.value}
+          eventId={eventId}
+          onRetry={() => retryConfirm(eventId, uid)}
+          onAbandon={() => abandonConfirm(eventId, uid)}
+          onRecheck={() => recheckConfirm(eventId, uid)}
+          onResubmit={() => resubmitWithNewId(eventId, uid)}
+          onClose={closeConfirm}
+        />
+      )}
     </div>
   );
 }
@@ -248,6 +276,7 @@ function Options() {
 
 function Footer({ onConfirm }: { onConfirm: () => void }) {
   const empty = cartLines.value.length === 0;
+  const busy = confirmState.value.kind !== 'idle';
   return (
     <div class={styles.footer}>
       <div class={styles.footerInner}>
@@ -255,9 +284,9 @@ function Footer({ onConfirm }: { onConfirm: () => void }) {
           <span class={styles.totalLabel}>合計</span>
           <span class={styles.totalValue}>{formatYen(cartTotal.value)}</span>
         </div>
-        {/* カートが空のときは確定できない。前の注文の確認中（pending）の扱いは #13・#14 */}
-        <Button variant="primary" big block disabled={empty} onClick={onConfirm}>
-          {empty ? 'メニューを選んでください' : '確定'}
+        {/* カートが空のとき・前の注文の確定の途中は、確定できない。前の注文の確認中（pending）の復元は #14 */}
+        <Button variant="primary" big block disabled={empty || busy} onClick={onConfirm}>
+          {busy ? '前の注文の確定中' : empty ? 'メニューを選んでください' : '確定'}
         </Button>
       </div>
     </div>

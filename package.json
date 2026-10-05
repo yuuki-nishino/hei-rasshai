@@ -25,7 +25,8 @@
     "@fontsource/zen-kurenaido": "^5.3.0",
     "@preact/signals": "^2.11.3",
     "firebase": "^12.19.0",
-    "preact": "^11.0.0"
+    "preact": "^11.0.0",
+    "qrcode-generator": "^2.0.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
