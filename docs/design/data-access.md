@@ -87,8 +87,10 @@ type Unsubscribe = () => void;
 ### 3.5 orders.ts
 | 関数 | 内容 |
 |---|---|
-| `confirmOrder(ctx: ConfirmContext): Promise<Order>` | 採番して作成（トランザクション）。既にあればそれを返す（冪等） |
-| `voidOrFind(ctx): Promise<{ result: 'found'; order: Order } \| { result: 'voided' }>` | 「やめる」。注文があれば返し、なければ墓標を作る（トランザクション） |
+| `newOrderId(eventId): string` | 確定ボタンの時点で作る注文ID（再試行で使い回す） |
+| `confirmOrder(eventId, ctx: ConfirmContext, uid): Promise<Order>` | 採番して作成（トランザクション）。既にあればそれを返す（冪等）。同時の確定で `permission` になったときは、墓標が無ければ、同じ `orderId` でやり直す（最大5回。order-confirm.md §5.1）。作成したときは、読み直さずに組み立てた注文を返す |
+| `voidOrFind(eventId, orderId, uid): Promise<{ result: 'found'; order: Order } \| { result: 'voided' }>` | 「やめる」。注文があれば返し、なければ墓標を作る（トランザクション） |
+| `voidExistsOnServer(eventId, orderId): Promise<boolean>` | 墓標があるか（`getDocFromServer`）。確定が `permission` で拒否されたときの確認 |
 | `findOrderOnServer(eventId, orderId): Promise<Order \| null>` | `getDocFromServer`。オフラインなら `AppError('offline')` |
 | `watchActiveOrders(eventId, cb: (orders: Order[]) => void, onError): Unsubscribe` | `status in [preparing, ready]`。`includeMetadataChanges: true`。**Shell の階層で、イベントを選んでいる間は、常に購読する**（接続状態の判定と、調理画面で共有） |
 | `watchOrdersOfDay(eventId, day, cb, onError): Unsubscribe` | 調理画面の「済みも表示」用（全状態） |

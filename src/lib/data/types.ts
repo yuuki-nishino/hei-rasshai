@@ -21,6 +21,35 @@ export interface Member {
 export type Payment = 'cash' | 'paypay';
 export type OrderStatus = 'preparing' | 'ready' | 'done' | 'cancelled';
 
+export interface OrderLine {
+  menuId: string;
+  name: string;
+  price: number;
+  qty: number;
+}
+
+/** 注文（data-model.md §2.6）。時刻は、書き込み直後（サーバー時刻の確定前）に null になり得る */
+export interface Order {
+  id: string;
+  number: number;
+  day: string;
+  items: OrderLine[];
+  total: number;
+  payment: Payment;
+  status: OrderStatus;
+  cancelledFrom: Exclude<OrderStatus, 'cancelled'> | null;
+  qr: boolean;
+  createdAt: Date | null;
+  readyAt: Date | null;
+  doneAt: Date | null;
+  cancelledAt: Date | null;
+  createdBy: string;
+  updatedBy: string;
+  updatedAt: Date | null;
+  /** この注文に、未送信の書き込みがある（metadata.hasPendingWrites） */
+  pending: boolean;
+}
+
 export interface MenuItem {
   id: string;
   name: string;

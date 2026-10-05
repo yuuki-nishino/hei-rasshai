@@ -2,6 +2,7 @@
 // - lib/data は、lib/firebase/staff の db を使う。テストでは、vi.mock で、利用者ごとの db に差し替える（setUser）
 // - 利用者の db は、modular SDK を Emulator につなぎ、mockUserToken でログイン済みにする（ルールが効く）
 // - キャッシュは、メモリ＋LRU（取得した文書を、オフラインになっても残す。本番の永続キャッシュの代わり）
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { initializeTestEnvironment, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
@@ -24,8 +25,24 @@ export function createEnv(): Promise<RulesTestEnvironment> {
   });
 }
 
-/** vi.mock の差し替え先（lib/firebase/staff の db）。setUser で切り替える */
-export const holder: { db: Firestore | null } = { db: null };
+// 並行に走らせる処理ごとの db（asUser の中で使う）。やり直しなどで、後から db を読み直しても、その処理の利用者のままになる
+const scoped = new AsyncLocalStorage<Firestore>();
+let current: Firestore | null = null;
+
+/** vi.mock の差し替え先（lib/firebase/staff の db）。setUser で切り替える。asUser の中では、その利用者の db */
+export const holder = {
+  get db(): Firestore | null {
+    return scoped.getStore() ?? current;
+  },
+  set db(db: Firestore | null) {
+    current = db;
+  },
+};
+
+/** fn の中（と、その中の非同期の続き）では、lib/data が db を使う（2台から並行に操作するテスト用） */
+export function asUser<T>(db: Firestore, fn: () => Promise<T>): Promise<T> {
+  return scoped.run(db, fn);
+}
 
 const opened: { app: FirebaseApp; db: Firestore }[] = [];
 let seq = 0;
@@ -34,9 +51,21 @@ export const emailOf = (uid: string) => `${uid}@example.com`;
 
 /** uid でログインした利用者の db を作り、lib/data の db をそれに切り替える */
 export function setUser(uid: string): Firestore {
+  return openUser(uid, 8080);
+}
+
+/**
+ * つながらない宛先につないだ利用者（本当のオフラインの代わり）。
+ * disableNetwork は、トランザクション（runTransaction）の通信を止めない（別の通り道で送られる）ため、確定のオフラインの確認には、こちらを使う（#13）
+ */
+export function setUnreachableUser(uid: string): Firestore {
+  return openUser(uid, 9); // 9 番（discard）には、Emulator がいない
+}
+
+function openUser(uid: string, port: number): Firestore {
   const app = initializeApp({ projectId, apiKey: 'demo' }, `user-${uid}-${++seq}`);
   const db = initializeFirestore(app, { localCache: memoryLocalCache({ garbageCollector: memoryLruGarbageCollector() }) });
-  connectFirestoreEmulator(db, '127.0.0.1', 8080, {
+  connectFirestoreEmulator(db, '127.0.0.1', port, {
     mockUserToken: { sub: uid, user_id: uid, email: emailOf(uid), email_verified: true },
   });
   opened.push({ app, db });

@@ -361,3 +361,16 @@
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
+
+.voidedNotice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--status-done-bg);
+  color: var(--status-done-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
