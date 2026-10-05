@@ -8,7 +8,7 @@ import { joinEvent } from '../../lib/data/events';
 import { currentUser } from '../../state/auth';
 import { selectEvent } from '../../state/event';
 import { leaveJoin } from '../../state/route';
-import { logout } from '../auth/logout';
+import { requestLogout } from '../../state/logout';
 import styles from './JoinPage.module.css';
 
 type State = 'checking' | 'denied' | 'offline' | 'timeout' | 'error';
@@ -79,7 +79,7 @@ export function JoinPage({ eventId }: { eventId: string }) {
             </div>
             <div class={styles.actions}>
               {/* ログアウトして、ログイン画面へ。/join のままなので、ログインし直すと、もう一度確かめる */}
-              <Button variant="primary" block onClick={() => void logout()}>
+              <Button variant="primary" block onClick={() => void requestLogout()}>
                 別のアカウントでログイン
               </Button>
               {toList}

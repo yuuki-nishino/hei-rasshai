@@ -1,9 +1,41 @@
-// メンバー・招待（data-access.md §3.3）。メンバー一覧・削除は #9
+// メンバー・招待（data-access.md §3.3）
 import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/staff';
 import { toAppError, type AppError } from './errors';
 import { assertOnline, withTimeout } from './online';
-import type { Invite, Unsubscribe } from './types';
+import type { Invite, Member, Unsubscribe } from './types';
+
+/** メンバーの一覧（オーナーが先、あとは表示名の順） */
+export function watchMembers(eventId: string, cb: (members: Member[]) => void, onError: (e: AppError) => void): Unsubscribe {
+  return onSnapshot(
+    collection(db, 'events', eventId, 'members'),
+    (snap) => {
+      const members = snap.docs.map((d) => ({
+        uid: d.id,
+        role: d.get('role') === 'owner' ? ('owner' as const) : ('member' as const),
+        displayName: String(d.get('displayName') ?? ''),
+        email: String(d.get('email') ?? ''),
+      }));
+      members.sort((a, b) => (a.role === b.role ? a.displayName.localeCompare(b.displayName, 'ja') : a.role === 'owner' ? -1 : 1));
+      cb(members);
+    },
+    (e) => onError(toAppError(e)),
+  );
+}
+
+/**
+ * メンバーを外す（オンライン必須）。オーナーが他のメンバーを外す、またはメンバーが自分で抜ける。
+ * オーナー自身は抜けられない（ルールが拒否する。イベントの削除のみ）
+ */
+export async function removeMember(eventId: string, uid: string): Promise<void> {
+  const ref = doc(db, 'events', eventId, 'members', uid);
+  await assertOnline(ref);
+  try {
+    await withTimeout(deleteDoc(ref));
+  } catch (e) {
+    throw toAppError(e);
+  }
+}
 
 /** 招待の一覧（オーナー用。発行の新しい順） */
 export function watchInvites(eventId: string, cb: (invites: Invite[]) => void, onError: (e: AppError) => void): Unsubscribe {

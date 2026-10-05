@@ -8,7 +8,7 @@ import { currentUser } from '../../state/auth';
 import { selectEvent } from '../../state/event';
 import { myEvents, myEventsError, retryMyEvents } from '../../state/myEvents';
 import { browserOnline } from '../../state/online';
-import { logout } from '../auth/logout';
+import { requestLogout } from '../../state/logout';
 import { CreateEventPage } from './CreateEventPage';
 import styles from './EventListPage.module.css';
 
@@ -26,7 +26,7 @@ export function EventListPage() {
         title="毎度おおきに"
         sub="イベント注文アプリ"
         actions={
-          <Button variant="secondary" onClick={() => void logout()}>
+          <Button variant="secondary" onClick={() => void requestLogout()}>
             ログアウト
           </Button>
         }

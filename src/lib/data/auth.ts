@@ -29,7 +29,7 @@ export async function signInWithGoogle(): Promise<'signed-in' | 'cancelled'> {
   }
 }
 
-// ログアウト。端末のキャッシュの消去（data-access.md §8）は、後のIssueで足す
+// ログアウト（Auth だけ）。未送信の確認と、端末のキャッシュの消去は state/logout.ts（data-access.md §8）
 export function signOut(): Promise<void> {
   return fbSignOut(auth);
 }
