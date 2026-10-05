@@ -51,19 +51,31 @@ function validationError(message: string): AppError {
   return Object.assign(new AppError('validation'), { message });
 }
 
-/** 追加（order = 最大 + 10）。名前・価格は画面で検査済みのもの。100件を超えるなら AppError('validation') */
+/** 名前・価格の検査（ルールの validMenu と同じ条件）。正しければ null */
+function checkPatch(patch: { name?: string; price?: number }): AppError | null {
+  if (patch.name !== undefined && parseMenuName(patch.name) !== patch.name) return validationError(MENU_NAME_ERROR);
+  if (patch.price !== undefined && !(Number.isInteger(patch.price) && patch.price >= PRICE_MIN && patch.price <= PRICE_MAX)) {
+    return validationError(PRICE_ERROR);
+  }
+  return null;
+}
+
+/**
+ * 追加（order = 最大 + 10）。名前・価格も、ここで検査する（オフラインで不正な値を足すと、つながるまで一覧に出てしまうため）。
+ * 100件を超えるなら AppError('validation')。件数は、この端末が見ている一覧で数える（ルールでは数えられない。data-model.md §2.5）
+ */
 export function addMenuItem(eventId: string, input: { name: string; price: number }, items: readonly MenuItem[]): Promise<void> {
   if (items.length >= MENU_MAX) return Promise.reject(validationError(`メニューは${MENU_MAX}件までです`));
+  const invalid = checkPatch(input);
+  if (invalid) return Promise.reject(invalid);
   const ref = doc(menuCol(eventId));
   return write(setDoc(ref, { name: input.name, price: input.price, order: nextMenuOrder(items), soldOut: false }));
 }
 
 /** 名前・価格・売り切れの更新。検査してから書く */
 export function updateMenuItem(eventId: string, id: string, patch: Partial<Pick<MenuItem, 'name' | 'price' | 'soldOut'>>): Promise<void> {
-  if (patch.name !== undefined && parseMenuName(patch.name) !== patch.name) return Promise.reject(validationError(MENU_NAME_ERROR));
-  if (patch.price !== undefined && !(Number.isInteger(patch.price) && patch.price >= PRICE_MIN && patch.price <= PRICE_MAX)) {
-    return Promise.reject(validationError(PRICE_ERROR));
-  }
+  const invalid = checkPatch(patch);
+  if (invalid) return Promise.reject(invalid);
   return write(updateDoc(doc(menuCol(eventId), id), patch));
 }
 

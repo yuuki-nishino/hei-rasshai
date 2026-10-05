@@ -18,9 +18,11 @@ describe('parsePrice', () => {
     ['1,000円', 1000],
     ['¥300', 300],
     ['1', 1],
+    ['１００，０００', 100000],
+    [' 500 ', 500],
     ['100000', 100000],
   ])('%s → %d', (s, v) => expect(parsePrice(s)).toBe(v));
-  it.each(['', '0', '100001', '-1', '500.5', 'abc', '5 00 0円円'])('%s は拒否', (s) => expect(parsePrice(s)).toBeNull());
+  it.each(['', '0', '100001', '-1', '500.5', 'abc', '5 00 0円円', '1,00', '1,0,0', ',100', '10000,0'])('%s は拒否', (s) => expect(parsePrice(s)).toBeNull());
 });
 
 describe('sortMenu / nextMenuOrder', () => {

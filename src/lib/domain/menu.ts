@@ -17,15 +17,18 @@ export function parseMenuName(input: string): string | null {
   return name.length >= 1 && name.length <= MENU_NAME_MAX ? name : null;
 }
 
-/** 価格：1〜100,000 の整数。全角数字・桁区切りのカンマ・「円」「¥」を受け付ける。不正なら null */
+/** 価格：1〜100,000 の整数。全角数字・3桁ごとのカンマ・「円」「¥」を受け付ける。不正なら null */
 export function parsePrice(input: string): number | null {
   const text = input
     .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
-    .replace(/[,，\s]/g, '')
+    .replace(/，/g, ',')
+    .replace(/\s/g, '')
     .replace(/^[¥￥]/, '')
     .replace(/円$/, '');
-  if (!/^\d+$/.test(text)) return null;
-  const price = Number(text);
+  // カンマは、3桁ごとの区切りだけを受け付ける（「1,000」は通り、「1,00」は通らない。PR #36 のレビュー M7）
+  if (!/^(\d+|\d{1,3}(,\d{3})+)$/.test(text)) return null;
+  const digits = text.replace(/,/g, '');
+  const price = Number(digits);
   return Number.isSafeInteger(price) && price >= PRICE_MIN && price <= PRICE_MAX ? price : null;
 }
 

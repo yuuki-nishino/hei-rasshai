@@ -23,8 +23,8 @@
 | `--color-surface` | `#fffdf8` | カード・入力欄・ダイアログ |
 | `--color-ink` / `--color-ink-sub` | `#2b2622` / `#6f655b` | 文字 / 補足の文字（地との差 5.0:1） |
 | `--color-line` / `--color-line-strong` | `#e2d8c8` / `#8c7d6c` | 区切り線・カードの枠 / 入力欄・副ボタンの枠（3.9:1） |
-| `--color-brand` / `--color-on-brand` | `#a63a24` / `#fff8ef` | 弁柄：のれん・主のボタン・ロゴ（6.1:1） |
-| `--color-nature` / `--color-nature-bg` | `#5e6b3a` / `#e7e9d6` | 苔：タブ・ロゴの下の線 |
+| `--color-brand` / `--color-on-brand` | `#a63a24` / `#fff8ef` | 弁柄：のれん・主のボタン・ロゴ（6.1:1）、選んでいるタブの下線（苔より見分けやすいため。#10） |
+| `--color-nature` / `--color-nature-bg` | `#5e6b3a` / `#e7e9d6` | 苔：ロゴの下の線、招待のリンク・メニューの追加の欄の地 |
 | `--color-focus` | `#1f5fbf` | フォーカスの輪 |
 
 状態・支払いは、地の色と文字の色の組（`--status-*-bg` / `--status-*-fg`、`--pay-*`）。色だけに頼らず、必ず文字（「調理中」など）と、状態には点を添える。
@@ -83,6 +83,7 @@ CSS は、部品ごとに CSS Modules（`*.module.css`）で書く（[ADR-0006](
 | `StatusBar` | 接続状態の帯（オンライン／オフライン／未送信◯件・未送信あり） |
 | `Noren` | 画面の上の帯（のれん）。見出し・補足・右端の操作。iPhone の上の切り欠きの分、余白を足す |
 | `Logo` | イベント注文アプリ「毎度おおきに」 |
+| `Tabs` | のれんの下のタブ（#10）。選んでいるタブは、弁柄の下線と太字。左右の矢印キーで移れる。中身は `role="tabpanel"` で結ぶ（`aria-controls`・`aria-labelledby`）。切り替える前に、入力中の欄を確定させる（`blurActiveInput`。iOS は、ボタンを押してもフォーカスを移さないため） |
 | `Loading` / `Empty` / `ErrorView` | 読み込み中・0件・取得失敗 |
 
 ## 4. ロゴ

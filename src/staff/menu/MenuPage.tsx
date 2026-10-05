@@ -1,16 +1,16 @@
 // メニュー（screens.md §3.8）。追加・名前と価格のインライン編集・▲▼の並べ替え・売り切れ・削除。
 // 書き込みは待たずに進める（オフラインでも受け付ける。data-access.md §3.9）。拒否されたときだけ知らせる
 import type { TargetedEvent, TargetedKeyboardEvent } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '../../components/Button';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Empty, ErrorView, Loading } from '../../components/Feedback';
 import { TextField } from '../../components/TextField';
 import { AppError } from '../../lib/data/errors';
-import { addMenuItem, deleteMenuItem, moveMenuItem, updateMenuItem, watchMenu } from '../../lib/data/menu';
+import { addMenuItem, deleteMenuItem, moveMenuItem, updateMenuItem } from '../../lib/data/menu';
 import type { MenuItem } from '../../lib/data/types';
 import { MENU_MAX, MENU_NAME_ERROR, MENU_NAME_MAX, parseMenuName, parsePrice, PRICE_ERROR } from '../../lib/domain/menu';
-import { selectEvent } from '../../state/event';
+import { useMenu } from '../../state/menu';
 import styles from './MenuPage.module.css';
 
 function messageOf(e: unknown): string {
@@ -20,19 +20,10 @@ function messageOf(e: unknown): string {
 }
 
 export function MenuPage({ eventId }: { eventId: string }) {
-  const [items, setItems] = useState<MenuItem[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // 一覧は共有ストア（state/menu.ts）から。外されたとき（permission）は、ストアが一覧へ戻す
+  const { items, error: loadError } = useMenu(eventId);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<MenuItem | null>(null);
-
-  useEffect(
-    () =>
-      watchMenu(eventId, setItems, (e) => {
-        if (e.code === 'permission') selectEvent(null); // 外された（data-access.md §5）
-        else setLoadError('メニューを読み込めませんでした');
-      }),
-    [eventId],
-  );
 
   /** 書き込みを待たずに進め、拒否されたら知らせる */
   const send = (p: Promise<void>) => {
@@ -43,7 +34,7 @@ export function MenuPage({ eventId }: { eventId: string }) {
     });
   };
 
-  if (loadError) return <ErrorView title={loadError} />;
+  if (loadError && !items) return <ErrorView title="メニューを読み込めませんでした" />;
   if (!items) return <Loading label="メニューを読み込み中…" />;
 
   return (
@@ -164,42 +155,73 @@ type RowProps = {
 };
 
 function MenuRow({ item, first, last, onUpdate, onMove, onDelete }: RowProps) {
-  // 入力中の値。フォーカスが外れたときに保存する。ほかのメンバーの変更は、編集中でなければ反映する
+  // 入力中の値。フォーカスが外れたときに保存する。
+  // - ほかのメンバーの変更は、編集中の欄でなければ、すぐ反映する（item が変わったときだけ同期。確定の直後に元の値へ戻さない。PR #36 のレビュー M2）
+  // - 確定のときは、フォーカスしたときの値（base）と比べる。変えていなければ書かない（ほかの人の変更を、古い値で上書きしない。M1）
+  // - 編集の途中で画面が外れたとき（タブの切り替えなど）も、確定する（M3）
   const [name, setName] = useState(item.name);
   const [price, setPrice] = useState(String(item.price));
-  const [editing, setEditing] = useState<'name' | 'price' | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
+  const editingRef = useRef<'name' | 'price' | null>(null);
+  const baseRef = useRef({ name: item.name, price: item.price });
+  const latestRef = useRef({ item, onUpdate });
+  useEffect(() => {
+    latestRef.current = { item, onUpdate };
+  });
+  // 外れるときの確定（下）では、入力中の値を、入力欄から直接読む（描画の後の更新を待たない）
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const priceInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (editing !== 'name') setName(item.name);
-    if (editing !== 'price') setPrice(String(item.price));
-  }, [item.name, item.price, editing]);
+    if (editingRef.current !== 'name') setName(item.name);
+    if (editingRef.current !== 'price') setPrice(String(item.price));
+  }, [item.name, item.price]);
 
-  function commitName() {
-    setEditing(null);
-    const n = parseMenuName(name);
+  function commitName(text: string) {
+    const { item: now, onUpdate: update } = latestRef.current;
+    editingRef.current = null;
+    const n = parseMenuName(text);
     if (n === null) {
-      setName(item.name); // 不正な値は、元に戻して知らせる
+      setName(now.name); // 不正な値は、元に戻して知らせる
       setRowError(MENU_NAME_ERROR);
       return;
     }
     setRowError(null);
+    if (n === baseRef.current.name) {
+      setName(now.name); // 変えていない：書かず、いまの値を出す
+      return;
+    }
     setName(n);
-    if (n !== item.name) onUpdate({ name: n });
+    update({ name: n });
   }
 
-  function commitPrice() {
-    setEditing(null);
-    const p = parsePrice(price);
+  function commitPrice(text: string) {
+    const { item: now, onUpdate: update } = latestRef.current;
+    editingRef.current = null;
+    const p = parsePrice(text);
     if (p === null) {
-      setPrice(String(item.price));
+      setPrice(String(now.price));
       setRowError(PRICE_ERROR);
       return;
     }
     setRowError(null);
+    if (p === baseRef.current.price) {
+      setPrice(String(now.price));
+      return;
+    }
     setPrice(String(p));
-    if (p !== item.price) onUpdate({ price: p });
+    update({ price: p });
   }
+
+  // 画面が外れるときに、編集中なら確定する（iOS は、ボタンを押してもフォーカスを移さず、blur が届かないことがある。M3）。
+  // useLayoutEffect：描画の直後に必ず登録する（useEffect は描画の後のフレームまで待つため、すぐ外れると登録されないことがある）
+  useLayoutEffect(
+    () => () => {
+      if (editingRef.current === 'name' && nameInputRef.current) commitName(nameInputRef.current.value);
+      if (editingRef.current === 'price' && priceInputRef.current) commitPrice(priceInputRef.current.value);
+    },
+    [],
+  );
 
   // Enter で確定（フォーカスを外す → blur で保存）
   const blurOnEnter = (e: TargetedKeyboardEvent<HTMLInputElement>) => {
@@ -209,36 +231,51 @@ function MenuRow({ item, first, last, onUpdate, onMove, onDelete }: RowProps) {
   return (
     <li class={`${styles.item} ${item.soldOut ? styles.soldOutItem : ''}`}>
       <input
+        ref={nameInputRef}
         class={`${styles.input} ${styles.name}`}
         aria-label="品名"
         value={name}
         maxLength={MENU_NAME_MAX * 2}
-        onFocus={() => setEditing('name')}
+        onFocus={() => {
+          editingRef.current = 'name';
+          baseRef.current.name = item.name;
+        }}
         onInput={(e) => setName(e.currentTarget.value)}
-        onBlur={commitName}
+        onBlur={(e) => commitName(e.currentTarget.value)}
         onKeyDown={blurOnEnter}
       />
       <div class={styles.priceWrap}>
         <input
+          ref={priceInputRef}
           class={`${styles.input} ${styles.price}`}
           aria-label={`${item.name}の価格（円）`}
           inputMode="numeric"
           value={price}
-          onFocus={() => setEditing('price')}
+          onFocus={() => {
+            editingRef.current = 'price';
+            baseRef.current.price = item.price;
+          }}
           onInput={(e) => setPrice(e.currentTarget.value)}
-          onBlur={commitPrice}
+          onBlur={(e) => commitPrice(e.currentTarget.value)}
           onKeyDown={blurOnEnter}
         />
         <span class={styles.yen}>円</span>
       </div>
       <div class={styles.controls}>
-        <button type="button" class={styles.move} aria-label={`${item.name}を上へ`} disabled={first} onClick={() => onMove('up')}>
+        {/* 端でも無効にしない（無効にすると、フォーカスが消え、キーボードの人が位置を見失う。M7）。押しても何もしない */}
+        <button type="button" class={styles.move} aria-label={`${item.name}を上へ`} aria-disabled={first} onClick={() => !first && onMove('up')}>
           ▲
         </button>
-        <button type="button" class={styles.move} aria-label={`${item.name}を下へ`} disabled={last} onClick={() => onMove('down')}>
+        <button type="button" class={styles.move} aria-label={`${item.name}を下へ`} aria-disabled={last} onClick={() => !last && onMove('down')}>
           ▼
         </button>
-        <button type="button" class={styles.toggle} aria-label={`${item.name}を売り切れにする`} aria-pressed={item.soldOut} onClick={() => onUpdate({ soldOut: !item.soldOut })}>
+        <button
+          type="button"
+          class={styles.toggle}
+          aria-label={`${item.name}を売り切れにする`}
+          aria-pressed={item.soldOut}
+          onClick={() => onUpdate({ soldOut: !item.soldOut })}
+        >
           {item.soldOut ? '売り切れ' : '販売中'}
         </button>
         <span class={styles.spacer} />

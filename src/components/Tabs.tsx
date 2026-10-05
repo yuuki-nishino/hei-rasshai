@@ -1,5 +1,7 @@
-// タブ（screens.md §1.2）。左右の矢印キーでも移れる
+// タブ（screens.md §1.2、visual.md §3）。左右の矢印キーでも移れる。
+// 中身の要素には role="tabpanel"・id={panelId}・aria-labelledby={tabId(selected)} を付ける（WAI-ARIA の Tabs。PR #36 のレビュー M6）
 import type { TargetedKeyboardEvent } from 'preact';
+import { blurActiveInput } from './blurActiveInput';
 import styles from './Tabs.module.css';
 
 type Props<T extends string> = {
@@ -7,15 +9,24 @@ type Props<T extends string> = {
   selected: T;
   onSelect: (id: T) => void;
   label: string;
+  /** 中身の要素の id */
+  panelId: string;
 };
 
-export function Tabs<T extends string>({ tabs, selected, onSelect, label }: Props<T>) {
+export const tabId = (id: string) => `tab-${id}`;
+
+export function Tabs<T extends string>({ tabs, selected, onSelect, label, panelId }: Props<T>) {
+  // 切り替える前に、入力中の欄を確定させる（iOS は、ボタンを押してもフォーカスを移さないため。レビュー M3）
+  const select = (id: T) => {
+    blurActiveInput();
+    onSelect(id);
+  };
   function onKeyDown(e: TargetedKeyboardEvent<HTMLDivElement>) {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
     const i = tabs.findIndex((t) => t.id === selected);
     const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length]!;
-    onSelect(next.id);
-    e.currentTarget.querySelector<HTMLButtonElement>(`[data-tab="${next.id}"]`)?.focus();
+    select(next.id);
+    e.currentTarget.querySelector<HTMLButtonElement>(`#${tabId(next.id)}`)?.focus();
   }
   return (
     <div class={styles.tabs} role="tablist" aria-label={label} onKeyDown={onKeyDown}>
@@ -24,11 +35,12 @@ export function Tabs<T extends string>({ tabs, selected, onSelect, label }: Prop
           key={t.id}
           type="button"
           role="tab"
-          data-tab={t.id}
+          id={tabId(t.id)}
           class={styles.tab}
           aria-selected={t.id === selected}
+          aria-controls={panelId}
           tabIndex={t.id === selected ? 0 : -1}
-          onClick={() => onSelect(t.id)}
+          onClick={() => select(t.id)}
         >
           {t.label}
         </button>

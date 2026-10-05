@@ -118,9 +118,9 @@
   cursor: pointer;
 }
 
-.move:disabled {
+.move[aria-disabled='true'] {
   opacity: 0.35;
-  cursor: not-allowed;
+  cursor: default;
 }
 
 /* 売り切れの切り替え。状態は色と文字の両方で示す */

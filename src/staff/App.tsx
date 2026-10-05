@@ -3,7 +3,8 @@ import { Button } from '../components/Button';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Empty } from '../components/Feedback';
 import { Noren } from '../components/Noren';
-import { Tabs } from '../components/Tabs';
+import { blurActiveInput } from '../components/blurActiveInput';
+import { tabId, Tabs } from '../components/Tabs';
 import { formatDayRange } from '../lib/domain/day';
 import { currentUser } from '../state/auth';
 import { cacheClearAsk, confirmCacheClear } from '../state/cacheClear';
@@ -39,24 +40,32 @@ function EventHome() {
         title={event?.name ?? 'イベント'}
         sub={event ? formatDayRange(event.startDate, event.endDate) : undefined}
         actions={
-          <Button variant="secondary" onClick={() => selectEvent(null)}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              blurActiveInput(); // 入力中の欄を、先に確定させる
+              selectEvent(null);
+            }}
+          >
             一覧へ
           </Button>
         }
       />
-      <Tabs tabs={TABS} selected={tab} onSelect={selectTab} label="画面の切り替え" />
-      <main class={styles.main}>
-        {tab === 'order' && <Empty title="注文の画面（準備中）" />}
-        {tab === 'menu' && eventId && <MenuPage eventId={eventId} />}
-        {tab === 'event' && (
-          <>
-            {event && uid && <MembersPanel eventId={event.id} uid={uid} isOwner={isOwner} />}
-            {event && uid && isOwner && <InvitePanel eventId={event.id} uid={uid} />}
-            <Button variant="secondary" onClick={() => void requestLogout()}>
-              ログアウト
-            </Button>
-          </>
-        )}
+      <Tabs tabs={TABS} selected={tab} onSelect={selectTab} label="画面の切り替え" panelId="tab-panel" />
+      <main>
+        <div class={styles.main} id="tab-panel" role="tabpanel" aria-labelledby={tabId(tab)}>
+          {tab === 'order' && <Empty title="注文の画面（準備中）" />}
+          {tab === 'menu' && eventId && <MenuPage eventId={eventId} />}
+          {tab === 'event' && (
+            <>
+              {event && uid && <MembersPanel eventId={event.id} uid={uid} isOwner={isOwner} />}
+              {event && uid && isOwner && <InvitePanel eventId={event.id} uid={uid} />}
+              <Button variant="secondary" onClick={() => void requestLogout()}>
+                ログアウト
+              </Button>
+            </>
+          )}
+        </div>
       </main>
     </>
   );

@@ -76,6 +76,13 @@ describe('追加・更新・削除', () => {
     expect(after[2]).toMatchObject({ name: 'ラムネ', price: 200, order: 45, soldOut: false });
   });
 
+  it('追加も、名前・価格を検査する（不正なら書かない）', async () => {
+    await seed();
+    setUser(ALICE);
+    await expect(addMenuItem('e1', { name: '', price: 100 }, [])).rejects.toMatchObject({ code: 'validation' });
+    await expect(addMenuItem('e1', { name: 'x', price: 0 }, [])).rejects.toMatchObject({ code: 'validation' });
+  });
+
   it('100件を超える追加は、validation で拒否（書かない）', async () => {
     await seed();
     setUser(ALICE);
