@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import '../styles/tokens.css';
 import '../styles/base.css';
+import { clearCacheOnStart } from '../state/cacheClear';
 import { App } from './App';
 
 // 手書きの文字（スタッフ画面だけ）。定義が大きい（gzip後 約65KB）ため、最初の表示を止めないよう、後から読み込む。
@@ -13,5 +14,6 @@ const root = document.getElementById('app')!;
 if (import.meta.env.MODE !== 'production' && location.hash === '#catalog') {
   void import('./catalog/Catalog').then(({ Catalog }) => render(<Catalog />, root));
 } else {
-  render(<App />, root);
+  // ログアウトで消せなかったキャッシュは、画面を出す前に消す（再読み込みする）。持ち越した消去も試す（data-access.md §8）
+  void clearCacheOnStart().then(() => render(<App />, root));
 }

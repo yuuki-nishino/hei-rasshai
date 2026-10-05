@@ -68,11 +68,11 @@ type Unsubscribe = () => void;
 ### 3.3 members.ts
 | 関数 | 内容 |
 |---|---|
-| `watchMembers(eventId, cb, onError): Unsubscribe` | |
+| `watchMembers(eventId, cb: (members: Member[]) => void, onError): Unsubscribe` | オーナーが先、あとは表示名の順。外されると `permission` で止まる（画面は、イベント一覧に戻す） |
 | `watchInvites(eventId, cb: (invites: Invite[]) => void, onError): Unsubscribe` | オーナー用。発行の新しい順。`createdAt` は、書き込み直後は見積もりの時刻（`serverTimestamps: 'estimate'`）。期限は `inviteExpiresAt` |
 | `createInvite(eventId, email, uid): Promise<void>` | **オンライン必須**。メールは、画面で `normalizeInviteEmail`（`lib/domain/invite.ts`：前後の空白除去・小文字・形の確認）を通したもの。`createdAt = serverTimestamp`。同じ相手には上書き（再発行＝期限が、その時点から1日） |
 | `cancelInvite(eventId, email): Promise<void>` | **オンライン必須** |
-| `removeMember(eventId, uid): Promise<void>` | オーナー用（他のメンバーのみ）。自分自身の削除（抜ける）にも使う（メンバーのみ。オーナーは不可） |
+| `removeMember(eventId, uid): Promise<void>` | **オンライン必須**（8秒で打ち切り）。オーナー用（他のメンバーのみ）。自分自身の削除（抜ける）にも使う（メンバーのみ。オーナーは不可） |
 
 ### 3.4 menu.ts
 | 関数 | 内容 |
@@ -238,3 +238,11 @@ Cloud Functions を使わないため、**オーナーの端末から、配下�
 - 外されたイベント自体の未送信は、どのみち拒否されるが、数えてしまうため、待ち続けることがある。**24時間たっても残るときは、「未送信が残っています。消してよいか」の確認を出す**（確認が取れれば消去する）
 
 - `clearIndexedDbPersistence` は、Firestoreを終了した後でなければ呼べない。そのため、再読み込みを伴う
+
+**#9 の実装**（`lib/data/cache.ts`、`lib/domain/cacheClear.ts`、`state/cacheClear.ts`・`state/logout.ts`）
+- 未送信の有無：`hasPendingWrites()`＝`waitForPendingWrites(db)` が1.5秒以内に終わらなければ「ある」とみなす（`trackWrite` の件数（§6.2、#19）ができるまでの代わり。再読み込みをまたいだ未送信も数えられる）
+- **メンバーでなくなったことの検知**：`permission-denied` の代わりに、`watchMyEvents` のサーバーで確かめた `memberOf` を使う。これまでに見た自分のイベント（`hei:knownEvents`）のうち、`memberOf` から消えたものがあれば、外れた（外された・抜けた・イベントが消えた・別のアカウントでログインした）とみなし、`hei:clearPending`（`{ since, events }`）に記録する。購読のエラーより確実で、アプリを閉じている間に外された場合も、次の起動で分かる
+- 消去の判断（`decideCacheClear`）：未送信が無い → すぐ消す（再読み込み）。ある → 持ち越す。24時間たっても残る → 「未送信の操作が残っています」の確認を出し、確認が取れれば消す
+- **別のイベントで作業している最中は、すぐには消さない**（再読み込みで、作業が途切れるため）。一覧に戻ったとき（作業の切れ目）と、次の起動時に試す。外されたイベント自体を開いていたときは、一覧に戻してから、すぐ試す
+- 消去待ちの間は、外されたイベントを、一覧に出さず、開けない
+- ログアウト：未送信があれば「未送信の操作があります」の確認 → 選択を消す → `signOut` → キャッシュの消去 → 再読み込み。別のタブが開いていて消せないときは、`hei:clearOnStart` を残し、次の起動時に、画面を出す前に消す

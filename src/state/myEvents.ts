@@ -5,6 +5,7 @@ import { watchMyEvents } from '../lib/data/events';
 import type { EventDoc } from '../lib/data/types';
 import { isSelectionGone } from '../lib/domain/event';
 import { currentUser } from './auth';
+import { clearMark, onServerMembership } from './cacheClear';
 import { currentEventId, selectEvent } from './event';
 
 /** null：まだ届いていない */
@@ -39,10 +40,15 @@ export function subscribeMyEvents(uid: string): () => void {
   return watchMyEvents(
     uid,
     (events, meta) => {
-      myEvents.value = { events, fromCache: meta.fromCache };
+      // 消去待ちの、外れたイベントは、一覧に出さず、開けない（data-access.md §8）
+      const hidden = clearMark.peek()?.events ?? [];
+      myEvents.value = { events: events.filter((e) => !hidden.includes(e.id)), fromCache: meta.fromCache };
       myEventsError.value = null;
+      const current = currentEventId.peek();
       // 選んでいるイベントから外れていたら、選択を外して一覧に戻す（消された・外された。レビュー E1）
-      if (isSelectionGone(currentEventId.peek(), meta)) selectEvent(null);
+      if (isSelectionGone(current, meta) || (current && hidden.includes(current))) selectEvent(null);
+      // 外れたイベントがあれば、端末のキャッシュの消去を始める（#9）
+      if (!meta.fromCache) onServerMembership(meta.memberOf);
     },
     (e) => (myEventsError.value = e),
   );

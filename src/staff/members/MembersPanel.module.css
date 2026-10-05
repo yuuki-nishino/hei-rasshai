@@ -1,0 +1,68 @@
+.panel {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.h2 {
+  font-family: var(--font-hand);
+  font-size: var(--fs-xl);
+  font-weight: 400;
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+.list {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+
+.who {
+  flex: 1;
+  min-width: 12em;
+  display: grid;
+}
+
+.name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.email {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+  overflow-wrap: anywhere;
+}
+
+.role {
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-nature-bg);
+  color: var(--color-nature);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.error {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.hint {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+}

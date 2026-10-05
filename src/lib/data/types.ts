@@ -11,6 +11,13 @@ export interface EventDoc {
   deleting: boolean;
 }
 
+export interface Member {
+  uid: string;
+  role: 'owner' | 'member';
+  displayName: string;
+  email: string;
+}
+
 /** 招待。期限（発行の1日後）は、画面で inviteExpiresAt で計算する。createdAt は、書き込み直後は見積もりの時刻 */
 export interface Invite {
   email: string;
