@@ -3,7 +3,6 @@ rules_version = '2';
 // セキュリティルール（design/security-rules.md §3）
 // - ルールは、一致したものの OR で判定される。サブコレクションごとに明示的に match を書き、
 //   書いていないものは、すべて拒否される（R4）
-// - 注文・墓標・メニュー・カウンター・レジ締めは #4 で足す（それまでは拒否）
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -15,6 +14,7 @@ service cloud.firestore {
 
     function isMember(e) { return signedIn() && exists(subPath(e, 'members', request.auth.uid)); }
     function isOwner(e)  { return signedIn() && get(eventPath(e)).data.ownerUid == request.auth.uid; }
+    function isDeleting(e) { return get(eventPath(e)).data.deleting == true; }
     // イベントがあり、削除中でない（参加・招待は、削除中・削除後のイベントでは受け付けない）
     function isActiveEvent(e) { return exists(eventPath(e)) && get(eventPath(e)).data.deleting == false; }
 
@@ -26,12 +26,37 @@ service cloud.firestore {
 
     function validDay(d) { return d is string && d.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
 
+    function okTransition(from, to) {
+      return from == to
+          || (from == 'preparing' && to in ['ready', 'cancelled'])
+          || (from == 'ready'     && to in ['done', 'preparing', 'cancelled'])
+          || (from == 'done'      && to in ['ready', 'cancelled'])
+          || (from == 'cancelled' && to in ['preparing', 'ready', 'done']);
+    }
+
     function validEvent(d) {
       return d.keys().hasOnly(['name', 'startDate', 'endDate', 'floatCash', 'ownerUid', 'deleting', 'createdAt'])
           && d.name is string && d.name.size() >= 1 && d.name.size() <= 60
           && validDay(d.startDate) && validDay(d.endDate) && d.startDate <= d.endDate
           && d.floatCash is int && d.floatCash >= 0 && d.floatCash <= 10000000
           && d.deleting is bool;
+    }
+
+    function validMenu(d) {
+      return d.keys().hasOnly(['name', 'price', 'order', 'soldOut'])
+          && d.name is string && d.name.size() >= 1 && d.name.size() <= 40
+          && d.price is int && d.price >= 1 && d.price <= 100000
+          && d.order is number && d.soldOut is bool;
+    }
+
+    function validClosing(d, day) {
+      return validDay(day)
+          && d.keys().hasOnly(['floatCash', 'expectedCash', 'actualCash', 'diff', 'note', 'closedAt', 'closedBy'])
+          && d.floatCash is int && d.floatCash >= 0
+          && d.expectedCash is int && d.actualCash is int && d.actualCash >= 0
+          && d.diff is int && d.diff == d.actualCash - d.expectedCash
+          && d.note is string && d.note.size() <= 200
+          && d.closedAt == request.time && d.closedBy == request.auth.uid;
     }
 
     // ---------- イベント ----------
@@ -95,6 +120,114 @@ service cloud.firestore {
         // オーナーが取り消す。招待された本人は、参加と同時に使い切る
         allow delete: if isOwner(eventId)
           || (signedIn() && request.auth.token.email_verified && myEmail() == email);
+      }
+
+      // ---------- 墓標（「やめる」で、その注文IDを以後使えなくする） ----------
+      match /voids/{orderId} {
+        allow get: if isMember(eventId);
+        allow create: if isMember(eventId)
+          // 書き込みの後に、注文が無い（同じバッチで、注文と墓標を両方作ることも拒否する）
+          && !existsAfter(subPath(eventId, 'orders', orderId))
+          && request.resource.data.keys().hasOnly(['createdBy', 'createdAt'])
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time;
+        allow update: if false;
+        allow delete: if isOwner(eventId) && isDeleting(eventId);
+      }
+
+      // ---------- 注文 ----------
+      match /orders/{orderId} {
+        // お客様：注文IDを知っている人が、その1件だけ読める（一覧は不可）
+        allow get: if true;
+        allow list: if isMember(eventId);
+
+        allow create: if isMember(eventId)
+          // 書き込みの後に、墓標が無い（墓標は、イベントの削除中以外は消せないため、「前に無い」も意味する）
+          && !existsAfter(subPath(eventId, 'voids', orderId))
+          && request.resource.data.keys().hasOnly(
+               ['number', 'day', 'items', 'total', 'payment', 'status', 'cancelledFrom', 'qr',
+                'createdAt', 'readyAt', 'doneAt', 'cancelledAt', 'createdBy', 'updatedBy', 'updatedAt'])
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.payment in ['cash', 'paypay']
+          && request.resource.data.number is int && request.resource.data.number >= 1
+          && validDay(request.resource.data.day)
+          && request.resource.data.total is int && request.resource.data.total >= 1
+          && request.resource.data.items is list
+          && request.resource.data.items.size() >= 1 && request.resource.data.items.size() <= 50
+          && request.resource.data.qr is bool
+          && request.resource.data.cancelledFrom == null
+          && request.resource.data.readyAt == null
+          && request.resource.data.cancelledAt == null
+          // QRあり → 調理中。QRなし → 確定と同時に渡し済み
+          && ((request.resource.data.status == 'preparing' && request.resource.data.qr == true
+                 && request.resource.data.doneAt == null)
+              || (request.resource.data.status == 'done' && request.resource.data.qr == false
+                 && request.resource.data.doneAt == request.time))
+          // 番号：カウンターが、同じ書き込みで、ちょうど1だけ進み、その値が number になる
+          && (exists(subPath(eventId, 'counters', request.resource.data.day))
+                ? get(subPath(eventId, 'counters', request.resource.data.day)).data.n : 0)
+               == request.resource.data.number - 1
+          && getAfter(subPath(eventId, 'counters', request.resource.data.day)).data.n
+               == request.resource.data.number;
+
+        // 作成後に変えられるのは、状態・支払い方法・時刻・更新者だけ
+        allow update: if isMember(eventId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+               ['status', 'payment', 'cancelledFrom', 'readyAt', 'doneAt',
+                'cancelledAt', 'updatedBy', 'updatedAt'])
+          && request.resource.data.payment in ['cash', 'paypay']
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedAt == request.time
+          && okTransition(resource.data.status, request.resource.data.status)
+          // 取り消し以外の状態では、cancelledFrom は null
+          && (request.resource.data.status == 'cancelled' || request.resource.data.cancelledFrom == null)
+          // 取り消すときは、直前の状態を cancelledFrom に残す
+          && (request.resource.data.status != 'cancelled' || resource.data.status == 'cancelled'
+              || request.resource.data.cancelledFrom == resource.data.status)
+          // 取り消しを戻すときは、取り消し前の状態に戻す
+          && (resource.data.status != 'cancelled' || request.resource.data.status == 'cancelled'
+              || request.resource.data.status == resource.data.cancelledFrom)
+          // 取り消し中のままの更新（支払い方法の変更など）では、cancelledFrom を変えない
+          && (request.resource.data.status != 'cancelled' || resource.data.status != 'cancelled'
+              || request.resource.data.cancelledFrom == resource.data.cancelledFrom)
+          // 時刻は、null・今・変更なし のいずれか
+          && (request.resource.data.readyAt == null || request.resource.data.readyAt == request.time
+              || request.resource.data.readyAt == resource.data.readyAt)
+          && (request.resource.data.doneAt == null || request.resource.data.doneAt == request.time
+              || request.resource.data.doneAt == resource.data.doneAt)
+          && (request.resource.data.cancelledAt == null || request.resource.data.cancelledAt == request.time
+              || request.resource.data.cancelledAt == resource.data.cancelledAt);
+
+        // イベントの削除中だけ
+        allow delete: if isOwner(eventId) && isDeleting(eventId);
+      }
+
+      // ---------- メニュー ----------
+      match /menu/{menuId} {
+        allow read: if isMember(eventId);
+        allow create, update: if isMember(eventId) && validMenu(request.resource.data);
+        allow delete: if isMember(eventId);
+      }
+
+      // ---------- 採番カウンター ----------
+      match /counters/{day} {
+        allow read: if isMember(eventId);
+        allow create: if isMember(eventId) && validDay(day)
+          && request.resource.data.keys().hasOnly(['n']) && request.resource.data.n == 1;
+        allow update: if isMember(eventId)
+          && request.resource.data.keys().hasOnly(['n'])
+          && request.resource.data.n == resource.data.n + 1;
+        allow delete: if isOwner(eventId) && isDeleting(eventId);
+      }
+
+      // ---------- レジ締め ----------
+      match /closings/{day} {
+        allow read: if isMember(eventId);
+        allow create, update: if isMember(eventId) && validClosing(request.resource.data, day);
+        allow delete: if isOwner(eventId) && isDeleting(eventId);
       }
 
       // 上に書いていないサブコレクションは、すべて拒否される

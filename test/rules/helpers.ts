@@ -72,3 +72,30 @@ export async function seed(env: RulesTestEnvironment, extra?: (db: Firestore) =>
     await extra?.(db);
   });
 }
+
+export const DAY = '2026-08-01';
+
+// 注文の行（data-model.md §2.6）
+export const orderItems = [{ menuId: 'm1', name: 'たこ焼き', price: 500, qty: 2 }];
+
+// 既存の注文（seed 用。ルールを無視して書くため、時刻は固定値）
+export function storedOrder(patch: Record<string, unknown> = {}) {
+  return {
+    number: 1,
+    day: DAY,
+    items: orderItems,
+    total: 1000,
+    payment: 'cash',
+    status: 'preparing',
+    cancelledFrom: null,
+    qr: true,
+    createdAt: hoursAgo(1),
+    readyAt: null,
+    doneAt: null,
+    cancelledAt: null,
+    createdBy: ALICE,
+    updatedBy: ALICE,
+    updatedAt: hoursAgo(1),
+    ...patch,
+  };
+}
