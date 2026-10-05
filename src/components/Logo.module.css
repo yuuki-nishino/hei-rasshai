@@ -1,0 +1,32 @@
+.logo {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.kind {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+  letter-spacing: 0.12em;
+}
+
+.name {
+  font-family: var(--font-hand);
+  font-size: var(--fs-3xl);
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--color-brand);
+  -webkit-text-stroke: 0.05em currentColor; /* ロゴは、ほかより太く */
+  paint-order: stroke fill;
+}
+
+/* 苔色の短い線（野外・自然の差し色） */
+.logo::after {
+  content: '';
+  width: 44px;
+  height: 4px;
+  margin-top: var(--sp-2);
+  border-radius: 2px;
+  background: var(--color-nature);
+}

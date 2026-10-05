@@ -1,0 +1,5 @@
+/* お客様画面：Webフォントを使わない（screens.md §4.3）。手書きの役の文字も、端末の文字で太く出す */
+:root {
+  --font-hand: var(--font-sys);
+  --hand-bold: 0.02em;
+}

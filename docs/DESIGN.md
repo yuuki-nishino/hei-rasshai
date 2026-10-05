@@ -30,6 +30,7 @@
 | [design/data-access.md](./design/data-access.md) | API設計（データアクセス層の関数・型・エラー・購読・接続状態・イベント削除） |
 | [design/order-confirm.md](./design/order-confirm.md) | 注文確定フロー（状態遷移・トランザクション・確認・復元） |
 | [design/screens.md](./design/screens.md) | 画面ごとの設計（データ・状態・操作・エラー・お客様画面） |
+| [design/visual.md](./design/visual.md) | 見た目の設計（雰囲気・色・文字・余白・共通部品・ロゴ） |
 | [design/testing.md](./design/testing.md) | テスト計画（ドメイン・ルール・結合・実機） |
 
 設計判断の記録：[ADR-0001 Preact](./adr/0001-use-preact.md)、[ADR-0002 PWAの範囲](./adr/0002-pwa-scope.md)、[ADR-0003 招待はメールアドレス宛て](./adr/0003-invite-by-email.md)、[ADR-0004 「やめる」は墓標で排他する](./adr/0004-void-tombstone.md)、[ADR-0005 スタッフ用とお客様用を別々にビルドする](./adr/0005-separate-builds.md)
@@ -39,6 +40,7 @@
 | 項目 | 採用 |
 |---|---|
 | フロント | Vite + TypeScript + Preact（ADR-0001）、`@preact/signals` |
+| スタイル | 素のCSS＋CSS変数＋CSS Modules（ADR-0006）。手書きの文字は `@fontsource/zen-kurenaido`（スタッフ画面だけ。[visual.md](./design/visual.md) §2） |
 | PWA | `vite-plugin-pwa`。Service Workerは最後に導入。ホーム画面への追加は任意（ADR-0002） |
 | DB | Cloud Firestore（Spark・無料、`asia-northeast1`） |
 | 認証 | Firebase Authentication（Googleのみ）。★U1 |
@@ -66,7 +68,8 @@ maido-ookini/
 ├─ src/
 │  ├─ staff/                  # スタッフ画面（app, auth, event, order, kitchen, sales, closing, menu）
 │  ├─ customer/               # お客様画面
-│  ├─ components/             # 共通部品（StatusBar, ConfirmDialog, Toast, BigButton …）
+│  ├─ components/             # 共通部品（Button, Badge, Card, TextField, ConfirmDialog, Toast, StatusBar, Noren, Logo …。visual.md §3）
+│  ├─ styles/                 # tokens.css（色・文字・余白の決まり）、base.css（土台）
 │  ├─ state/                  # signals（認証・現在のイベント・接続状態・購読データ）
 │  └─ lib/
 │     ├─ firebase/

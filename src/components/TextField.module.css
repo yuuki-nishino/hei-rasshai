@@ -1,0 +1,43 @@
+.field {
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.label {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.input {
+  min-height: var(--tap-min);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 2px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--fs-md); /* 16px 未満だと、iPhone が入力時に拡大する */
+}
+
+.input::placeholder {
+  color: var(--color-ink-sub);
+}
+
+.input:focus-visible {
+  outline-offset: 0;
+  border-color: var(--color-focus);
+}
+
+.invalid {
+  border-color: var(--status-void-fg);
+}
+
+.hint {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+}
+
+.error {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--status-void-fg);
+}

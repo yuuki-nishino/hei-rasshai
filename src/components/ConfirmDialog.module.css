@@ -1,0 +1,33 @@
+.dialog {
+  width: min(100% - 2 * var(--sp-4), 420px);
+  padding: var(--sp-6) var(--sp-5) var(--sp-5);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-float);
+}
+
+.dialog::backdrop {
+  background: rgb(43 38 34 / 0.45);
+}
+
+.title {
+  font-family: var(--font-hand);
+  font-size: var(--fs-xl);
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+.body {
+  margin-top: var(--sp-3);
+  color: var(--color-ink-sub);
+}
+
+/* 実行と取り消しを離す（誤操作を防ぐ。screens.md §2）。実行は右、やめるは左 */
+.actions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-6);
+  margin-top: var(--sp-6);
+}

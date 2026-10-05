@@ -1,0 +1,76 @@
+/* 見た目の決まり（docs/design/visual.md）。色・文字・余白は、ここの変数だけを使う */
+:root {
+  color-scheme: light; /* ライトのみ（屋外で見やすいため。visual.md §2） */
+
+  /* 基調：弁柄 × 生成り */
+  --color-bg: #f5f0e6; /* 生成り：画面の地 */
+  --color-surface: #fffdf8; /* カード・入力欄 */
+  --color-ink: #2b2622; /* 文字 */
+  --color-ink-sub: #6f655b; /* 補足の文字 */
+  --color-line: #e2d8c8; /* 区切り線・カードの枠 */
+  --color-line-strong: #8c7d6c; /* 入力欄の枠（地との差 3:1 以上） */
+  --color-brand: #a63a24; /* 弁柄：のれん・主のボタン・ロゴ */
+  --color-brand-press: #8a2f1d;
+  --color-on-brand: #fff8ef;
+  --color-nature: #5e6b3a; /* 苔：タブ・飾りの線 */
+  --color-nature-bg: #e7e9d6;
+  --color-focus: #1f5fbf; /* フォーカスの輪（どの地でも見える青） */
+
+  /* 状態の色（SPEC §7.5）。地の色＋文字の色の組。色だけでなく、必ず文字も添える */
+  --status-cooking-bg: #fbe7a1;
+  --status-cooking-fg: #5f4500;
+  --status-ready-bg: #cbe8c6;
+  --status-ready-fg: #1d5427;
+  --status-done-bg: #e3e2dd;
+  --status-done-fg: #4f4d48;
+  --status-void-bg: #f6d0cc;
+  --status-void-fg: #8f1d1d;
+
+  /* 支払いの色 */
+  --pay-cash-bg: #fff0bf;
+  --pay-cash-fg: #6e4f00;
+  --pay-paypay-bg: #d42a35;
+  --pay-paypay-fg: #ffffff;
+
+  /* 文字。手書き（Zen Kurenaido）は、見出し・ボタン・番号だけ。本文・金額は、端末の文字 */
+  --font-sys: system-ui, -apple-system, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', sans-serif;
+  --font-hand: 'Zen Kurenaido', var(--font-sys);
+  --hand-bold: 0.035em; /* 手書きを太く見せる縁取りの幅（Zen Kurenaido は太字がないため） */
+  --fs-xs: 0.8125rem; /* 13px */
+  --fs-sm: 0.875rem; /* 14px */
+  --fs-md: 1rem; /* 16px：本文 */
+  --fs-lg: 1.1875rem; /* 19px：ボタン */
+  --fs-xl: 1.5rem; /* 24px：見出し */
+  --fs-2xl: 2rem; /* 32px：注文番号 */
+  --fs-3xl: 2.5rem; /* 40px：ロゴ */
+  --lh-tight: 1.25;
+  --lh-body: 1.7;
+
+  /* 余白（4px 刻み） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+
+  /* 角・影・高さ */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgb(60 40 20 / 0.06);
+  --shadow-raised: 0 3px 0 rgb(60 30 15 / 0.22); /* 主のボタン：木札のような厚み */
+  --shadow-float: 0 8px 28px rgb(60 40 20 / 0.18); /* ダイアログ・トースト */
+  --tap-min: 44px; /* 押せる部分の最小（screens.md §5） */
+  --tap-big: 56px;
+  --dur: 160ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur: 0ms;
+  }
+}

@@ -1,0 +1,13 @@
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: var(--sp-3) var(--sp-4);
+}
+
+/* お渡し済み・取り消しなど、終わったもの。薄くせず（文字のコントラストを保つ）、地と影で控えめにする */
+.muted {
+  background: var(--color-bg);
+  box-shadow: none;
+}

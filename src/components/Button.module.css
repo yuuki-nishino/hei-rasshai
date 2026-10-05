@@ -1,0 +1,79 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: var(--tap-min);
+  padding: var(--sp-2) var(--sp-5);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font-hand);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    transform var(--dur) ease,
+    background-color var(--dur) ease,
+    box-shadow var(--dur) ease;
+  touch-action: manipulation;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.big {
+  min-height: var(--tap-big);
+  padding-inline: var(--sp-6);
+  font-size: var(--fs-xl);
+}
+
+.block {
+  display: flex;
+  width: 100%;
+}
+
+/* 主：その画面でいちばん大事な操作。1画面に1つ */
+.primary {
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  box-shadow: var(--shadow-raised);
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+.primary:not(:disabled):active {
+  background: var(--color-brand-press);
+  box-shadow: none;
+  transform: translateY(3px);
+}
+
+/* 副：戻る・クリアなど */
+.secondary {
+  background: var(--color-surface);
+  border-color: var(--color-line-strong);
+  color: var(--color-ink);
+}
+
+.secondary:not(:disabled):active {
+  background: var(--color-bg);
+}
+
+/* 危険：取り消し・削除。塗らずに赤い枠（基調の赤と区別する）。押すと確認ダイアログ */
+.danger {
+  background: var(--color-surface);
+  border-color: currentColor;
+  color: var(--status-void-fg);
+}
+
+.danger:not(:disabled):active {
+  background: var(--status-void-bg);
+}
+
+/* 確認ダイアログの中の「実行」（取り消す・削除する） */
+.dangerSolid {
+  background: var(--status-void-fg);
+  color: #fff;
+}

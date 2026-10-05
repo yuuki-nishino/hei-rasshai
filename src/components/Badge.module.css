@@ -1,0 +1,50 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* 状態は、点＋文字（色だけに頼らない） */
+.dot::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.preparing {
+  background: var(--status-cooking-bg);
+  color: var(--status-cooking-fg);
+}
+
+.ready {
+  background: var(--status-ready-bg);
+  color: var(--status-ready-fg);
+}
+
+.done {
+  background: var(--status-done-bg);
+  color: var(--status-done-fg);
+}
+
+.cancelled {
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+}
+
+.cash {
+  background: var(--pay-cash-bg);
+  color: var(--pay-cash-fg);
+}
+
+.paypay {
+  background: var(--pay-paypay-bg);
+  color: var(--pay-paypay-fg);
+}

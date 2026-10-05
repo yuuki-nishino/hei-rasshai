@@ -1,0 +1,53 @@
+/* のれん：画面の上の帯。下の端に、切れ目を3本入れる */
+.noren {
+  position: relative;
+  padding: calc(var(--sp-3) + env(safe-area-inset-top, 0px)) var(--sp-4) var(--sp-3);
+  margin-bottom: 10px;
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+}
+
+.noren::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: -10px;
+  height: 10px;
+  background: linear-gradient(
+    90deg,
+    var(--color-brand) 0 24.6%,
+    transparent 24.6% 25.4%,
+    var(--color-brand) 25.4% 49.6%,
+    transparent 49.6% 50.4%,
+    var(--color-brand) 50.4% 74.6%,
+    transparent 74.6% 75.4%,
+    var(--color-brand) 75.4%
+  );
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  max-width: 960px;
+  margin-inline: auto;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-family: var(--font-hand);
+  font-size: var(--fs-xl);
+  font-weight: 400;
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+  overflow-wrap: anywhere;
+}
+
+.sub {
+  font-size: var(--fs-xs);
+  opacity: 0.9;
+}
