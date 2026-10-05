@@ -87,8 +87,9 @@ const PRICE = String.raw`(?:¥\s*)?(\d{1,3}(?:,\d{3})+|\d+)\s*円?`;
 const BULK_LINE = new RegExp(String.raw`^(.+?)([\s,:]+)${PRICE}$`);
 const PRICE_ONLY = new RegExp(`^${PRICE}$`);
 const PRICE_TAIL = new RegExp(`${PRICE}$`);
-// 行頭の箇条書きの記号（メモからの貼り付け）
-const BULLET = /^[-*•・]\s*/;
+// 行頭の箇条書きの記号（メモからの貼り付け）。- * • は、後ろに空白があるときだけ（「-20%セット」の - は品名。PR #37 の再レビュー B7）。
+// ・は、空白なしで書くことが多いため、いつも除く
+const BULLET = /^(?:[-*•]\s+|・\s*)/;
 
 /**
  * メニューのまとめて追加（data-model.md §5.6）。1行に「名前 価格」。空行は無視する。
@@ -103,7 +104,7 @@ export function parseBulkMenu(text: string): BulkMenuResult {
     if (t === '') return;
     const s = normalizeBulkLine(t); // 1文字 → 1文字の置き換えなので、t と同じ長さ（位置で、元の文を切り出せる）
     const err = (reason: string) => result.errors.push({ line, text: raw.trim(), reason });
-    if (PRICE_ONLY.test(s)) return err('品名がありません');
+    if (PRICE_ONLY.test(s.replace(/^[\s,:]+/, ''))) return err('品名がありません'); // 「,500」も（再レビュー B8）
     const m = BULK_LINE.exec(s);
     if (!m) {
       // 価格の形はあるのに、品名との間に区切りが無い（「焼きそば600円」。レビュー B4）
