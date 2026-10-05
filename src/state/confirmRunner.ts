@@ -55,6 +55,17 @@ export interface InflightTracker {
   onSettled?: () => void;
 }
 
+/**
+ * 裏の処理があれば、終わった（成功・失敗のどちらでも）あとに fn を呼び、true を返す。無ければ何もせず false。
+ * 失敗を、処理されない拒否（unhandled rejection）にしない（.finally ではなく .then(next, next)。PR #41 の再レビュー R1）
+ */
+export function whenSettled(tracker: InflightTracker, fn: () => void): boolean {
+  if (!tracker.current) return false;
+  const next = () => fn();
+  void tracker.current.then(next, next);
+  return true;
+}
+
 export function createConfirmRunner(
   deps: ConfirmDeps,
   store: { get(): ConfirmState; set(s: ConfirmState): void },

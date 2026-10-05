@@ -9,7 +9,7 @@ import { initialConfirmState, type ConfirmContext, type ConfirmedOrder, type Con
 import { toDay } from '../lib/domain/day';
 import { parseTendered } from '../lib/domain/order';
 import { cartLines, cartTotal, clearCart, payment, qr, tenderedText } from './cart';
-import { createConfirmRunner, type InflightTracker, type PendingRecord } from './confirmRunner';
+import { createConfirmRunner, whenSettled, type InflightTracker, type PendingRecord } from './confirmRunner';
 import { currentEventId } from './event';
 import { readStorage, writeStorage } from './storage';
 
@@ -90,12 +90,10 @@ function runnerFor(eventId: string, uid: string) {
 export function resumePending(eventId: string, uid: string): void {
   // 前の（離れたイベント・作り直す前のランナーの）裏の処理が終わるまで待つ。重なると、書き込みの完了前に確かめて
   // 「登録されていません」と誤ることがある（PR #41 のレビュー P2）
-  if (tracker.current) {
-    void tracker.current.finally(() => {
-      if (currentEventId.peek() === eventId) resumePending(eventId, uid);
-    });
-    return;
-  }
+  const waiting = whenSettled(tracker, () => {
+    if (currentEventId.peek() === eventId) resumePending(eventId, uid); // 待つ間に、別のイベントへ移っていなければ
+  });
+  if (waiting) return;
   const r = runnerFor(eventId, uid);
   const p = readPending(eventId);
   if (p) r.restore(p);

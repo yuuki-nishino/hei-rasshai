@@ -58,3 +58,35 @@
 
 - `pending` の保存の時機（確定のトランザクションの前、「やめる」の前に `abandoning: true` で保存し直す）と、消去の時機（`done`・`idle`）
 - `decide`・`unverifiable` の間は記録を残し、記録がある間は新しい注文を確定できないこと
+
+## 再レビュー（対応コミット `489bf76`）
+
+対象：P1・P2 への対応（`src/state/confirm.ts`、`src/state/confirmRunner.ts`、`src/state/confirmRunner.test.ts`、order-confirm.md §5.4）。コードを読んで確かめた。テストは、手元では動かしていない。
+
+**P1・P2 とも、直し方は妥当。** 目印（`InflightTracker`）をランナーの外に1つ持ち、終わったら `onSettled` で「確認中です」を消す形で、指摘した2つの経路はふさがっている。残る指摘は1件（🟡）。
+
+| # | 重大度 | 内容 |
+|---|---|---|
+| R1 | 🟡 低 | `resumePending` の待ち（`tracker.current.finally(...)`）が、裏の処理の失敗を、処理されない拒否（unhandled rejection）にする |
+
+### R1 🟡 待ちの `.finally()` が、失敗を握りつぶさず、コンソールに出す
+
+**場所**：`src/state/confirm.ts`（`resumePending`）
+
+**問題**：
+- `track()` は、`tracked.catch(() => {})` で、`tracked` 自身の拒否だけを処理している
+- `resumePending` の `void tracker.current.finally(...)` は、**新しい** Promise を作る。元が拒否されると、これも同じ理由で拒否され、だれも処理しない
+
+**起こりうること**：書き込みが遅い間に、イベントを離れて戻る。その書き込みが、`offline` などで失敗する。`resumePending` の待ちが `unhandledrejection` になり、コンソールにエラーが出る（エラー収集を入れた場合は、ノイズになる）。復元そのものは、`finally` の中で進むので動く。
+
+**直し方の案**：`.finally(...)` を `.then(next, next)`、または `.catch(() => {}).then(next)` にする。
+
+### 確かめて、問題が無かったこと
+
+- `track()` の `tracker.current === tracked` の判定：再試行で、新しい裏の処理が目印を上書きしても、古い処理の終わりが、新しい目印を消さない
+- 待っている間に、別のイベントへ移ったとき：`currentEventId.peek() === eventId` の判定で、古いイベントの復元は始まらない
+- 古いランナーの遅れた結果：共有の `confirmState` に対する `still()` の判定で捨てられる。pending は残るので、待ったあとの `resumePending` が、`findOrder` で確かめる
+
+### テストについて（ℹ️）
+
+P2 の単体テストは、`runner.restore` が `false` を返すところまでを確かめている。`resumePending` の待ちと、終わったあとの再実行は、テストされていない（上の R1 も、そこで見つかる）。待ちの部分に、テストを1件足すとよい。

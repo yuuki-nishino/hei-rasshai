@@ -1,7 +1,7 @@
 // 確定フローを動かす部分（8秒の時間切れ・遅れた結果・やめる）。偽のタイマーで確かめる（testing.md §2 の confirmReducer）
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialConfirmState, type ConfirmContext, type ConfirmedOrder, type ConfirmState } from '../lib/domain/confirmFlow';
-import { CONFIRM_TIMEOUT_MS, createConfirmRunner, type ConfirmDeps, type InflightTracker, type PendingRecord } from './confirmRunner';
+import { CONFIRM_TIMEOUT_MS, createConfirmRunner, whenSettled, type ConfirmDeps, type InflightTracker, type PendingRecord } from './confirmRunner';
 
 const ctx: ConfirmContext = {
   orderId: 'o1',
@@ -338,6 +338,20 @@ describe('createConfirmRunner', () => {
       expect(b.runner.restore({ ctx, abandoning: false })).toBe(true);
       await flush();
       expect(b.state()).toMatchObject({ kind: 'done', recovered: true });
+    });
+
+    it('whenSettled：裏の処理が失敗しても、終わったあとに一度だけ呼ぶ。拒否は処理されないまま残らない（再レビュー R1）', async () => {
+      const tracker: InflightTracker = { current: null };
+      const slow = deferred<ConfirmedOrder>();
+      const a = setup({ confirmOrder: () => slow.promise }, tracker);
+      a.runner.submit(ctx);
+      const resume = vi.fn();
+      expect(whenSettled(tracker, resume)).toBe(true); // 待つ
+      expect(resume).not.toHaveBeenCalled();
+      slow.reject({ code: 'offline' }); // 前の書き込みが、失敗で終わる（処理されない拒否があれば、Vitest がテストを失敗させる）
+      await flush();
+      expect(resume).toHaveBeenCalledTimes(1);
+      expect(whenSettled(tracker, resume)).toBe(false); // 裏の処理が無ければ、待たない
     });
 
     it('unverifiable でなければ、kick は何もしない', () => {
