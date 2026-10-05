@@ -1,0 +1,22 @@
+.form {
+  display: grid;
+  gap: var(--sp-5);
+  max-width: 640px;
+  margin-inline: auto;
+  padding: var(--sp-4) var(--sp-4) calc(var(--sp-10) + env(safe-area-inset-bottom, 0px));
+}
+
+.dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+
+.error {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}

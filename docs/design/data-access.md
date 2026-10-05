@@ -51,13 +51,13 @@ type Unsubscribe = () => void;
 ### 3.2 events.ts
 | 関数 | 内容 |
 |---|---|
-| `watchMyEvents(uid, cb: (events: EventDoc[]) => void, onError): Unsubscribe` | `members` のコレクショングループ（`uid` 一致）を購読し、親のイベントを `getDoc`（**キャッシュも使う**）で取得して一覧にする。オフラインで起動しても、キャッシュにあるイベントを表示できる（SPEC 7.3）。**孤立の掃除の判定にだけ**、`getDocFromServer` を使う（下記） |
+| `watchMyEvents(uid, cb: (events: EventDoc[], meta: { fromCache: boolean; memberOf: string[] }) => void, onError): Unsubscribe` | `members` のコレクショングループ（`uid` 一致）を購読し、親のイベントを `getDoc`（**キャッシュも使う**）で取得して一覧にする（開始日の新しい順）。オフラインで起動しても、キャッシュにあるイベントを表示できる（SPEC 7.3）。**孤立の掃除の判定にだけ**、`getDocFromServer` を使う（下記）。`fromCache`：サーバーで確かめていない一覧（0件のとき、画面は「イベントがありません」と言い切らない。#7）。`memberOf`：自分の `members` があるイベントのID（表示できないものも含む。選んでいるイベントから外れたかの判定に使う。PR #32 のレビュー E1）。親のイベントは1回だけ取るため、イベントの変更（名前・削除中）は、購読し直すまで反映されない。画面は、一覧に戻るたびに購読し直す（screens.md §3.2） |
 | `createEvent(input, user): Promise<string>` | **オンライン必須**（[§3.9](#39-オンライン必須の書き込み)）。イベント（`deleting = false`）＋オーナーの `members` を、1バッチで作成。`eventId` を返す。`displayName` は §3.9 の規則 |
 | `updateEvent(eventId, patch): Promise<void>` | 名前・日付・準備金 |
 | `deleteEventDeep(eventId, onProgress): Promise<void>` | **オンライン必須**。配下を削除（[§7](#7-イベント削除)） |
 | `joinEvent(eventId, user): Promise<void>` | **オンライン必須**。すでにメンバーなら何もしない。そうでなければ、メンバー作成＋招待の削除（1バッチ）。最初の確認は、`members/{uid}` の `getDocFromServer`（`permission-denied` は「メンバーではない」と判断する）。`displayName` は §3.9 の規則 |
 
-**`watchMyEvents` の孤立の掃除（自分の `members` の削除）の条件**
+**`watchMyEvents` の孤立の掃除（自分の `members` の削除）の条件**（判定は `lib/data/myEvents.ts` の `resolveMyEvents`。Firestore に依存させず、単体テストで全分岐を確かめる。#7）
 - 一覧の表示（キャッシュ可）と、削除の判定（サーバー必須）は、分ける。**判定のための `getDocFromServer` が失敗しても、一覧からは消さない**（キャッシュのイベントを出し続ける）
 - 削除してよいのは、**`getDocFromServer` が、サーバーからの結果として、イベントが存在しない（`exists() === false`）と返したときだけ**
   - メンバーであれば、イベントが無くても、`get` はルール上許可され、`exists() === false` が返る
@@ -135,11 +135,11 @@ type OrderAction = 'ready' | 'backToPreparing' | 'done' | 'backToReady' | 'cance
 次の書き込みは、`batch` や `set` で書くと、オフラインでも受け付けられて、溜まる（画面は完了を待ち続け、後から、思わぬタイミングで反映される）。**書く前に、サーバーへの到達を確かめる**。
 
 - 対象：`createEvent`、`joinEvent`、`createInvite`・`cancelInvite`、`saveClosing`、`deleteEventDeep`、`removeMember`
-- `assertOnline(ref)`：`getDocFromServer(ref)` を実行する。`unavailable`・タイムアウト（8秒）なら、`AppError('offline')`（「通信が必要です」）を投げて、**書かない**。`permission-denied`・`not-found` は、サーバーに届いた証拠なので、通信ありとして扱う（`createEvent` のように、まだ存在しない文書でも使える）
+- `assertOnline(ref)`（`lib/data/online.ts`）：`getDocFromServer(ref)` を実行する。`unavailable`・タイムアウト（8秒）なら、`AppError('offline')`（「通信が必要です」）を投げて、**書かない**。`permission-denied`・`not-found` は、サーバーに届いた証拠なので、通信ありとして扱う（`createEvent` のように、まだ存在しない文書でも使える）
 - 確認の直後に、通信が切れることは、あり得る。そのときは、書き込みが溜まるが、確認と書き込みの間は短く、頻度が低いため、既知の制約とする。画面は、接続状態（§6）がオフラインの間は、これらの操作のボタンを無効にする。ただし、接続状態の判定は、Shellの購読（イベントを選んでいる間）に依存する。**イベント一覧と `/join` では、`navigator.onLine` だけで判定する**（`assertOnline` があるので、判定が粗くても、書き込みは溜まらない）
 - 調理画面の操作（`transitionOrder`、`changePayment`）と、メニュー・イベントの編集は、**対象外**（オフラインでも受け付け、`trackWrite` で数える。メニューは、`trackWrite` の対象外）
 
-**`displayName` の決め方**（`createEvent`・`joinEvent`）：Googleの表示名（`user.displayName`）を、前後の空白を除いて使う。`null`・空のときは、メールの `@` より前を使う。**60文字を超える場合は、60文字に切り詰める**（ルールが、61文字以上を拒否するため。拒否されると、「招待されていません」と誤った案内になる）
+**`displayName` の決め方**（`createEvent`・`joinEvent`。`lib/domain/event.ts` の `memberDisplayName`）：Googleの表示名（`user.displayName`）を、前後の空白を除いて使う。`null`・空のときは、メールの `@` より前を使う。**60文字を超える場合は、60文字に切り詰める**（ルールが、61文字以上を拒否するため。拒否されると、「招待されていません」と誤った案内になる）。文字数は、ルールと同じく UTF-16 の単位で数え、絵文字の途中では切らない（data-model.md §2 の注）
 
 ## 4. エラー設計
 

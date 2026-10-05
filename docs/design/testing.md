@@ -8,7 +8,7 @@
 |---|---|---|---|
 | ドメイン（純粋関数） | Vitest | 日付・集計・レジ締め・パース・CSV・遷移・確定フローのreducer・接続状態・お客様画面の判定 | ○ |
 | ルール | Firebase Emulator ＋ `@firebase/rules-unit-testing` | firestore.rules | ○ |
-| データアクセス | Vitest ＋ Emulator | 確定フロー（冪等性・採番・墓標）、遷移、招待・参加、オフライン | ○ |
+| データアクセス | Vitest ＋ Emulator（`test/data`、`npm run test:data`） | 確定フロー（冪等性・採番・墓標）、遷移、招待・参加、オフライン | ○ |
 | 画面 | 手動（実機） | 画面の操作、オフライン、レイアウト | × |
 
 - 画面のE2E自動化は、今回は見送る（実機での通し確認を重視。費用対効果が低いため）
@@ -132,6 +132,10 @@
 | 24 | **メンバーから外れたとき：他のイベントに未送信がある** | キャッシュの消去が保留され、未送信が送られた後に消去される。未送信が残る間は、起動時に持ち越す |
 | 25 | `deleting = true` で止まったイベント | 一覧に「削除中」。「削除を再開」で、続きから完了する |
 | 26 | `createEvent`・`joinEvent`：`displayName` が `null`／61文字以上 | メールのローカル部分／60文字に切り詰めて、成功する |
+
+- 仕組み（#7）：`lib/data` が使う `db` を、`vi.mock` で、テストの利用者の `db` に差し替える。利用者の `db` は、modular SDK を Emulator につなぎ、`mockUserToken` でログイン済みにする（ルールが効く）。キャッシュは、メモリ＋LRU（取得した文書が、オフラインでも残る。本番の永続キャッシュの代わり）。`test/data/helpers.ts`
+- #7 の結果：15・16b・21・23（`createEvent`）・26 は `test/data/events.test.ts` で確認した。**16a**（`permission-denied`）は、Emulator では作りにくい（購読の結果に出る `members` は、自分がメンバーであることを意味するため）ので、判定の部分を単体テスト（`src/lib/data/myEvents.test.ts`）で確かめた。15・16b も、判定の全分岐を単体テストで確かめている
+- #7 で分かったこと：ルールの文字数は UTF-16 の単位（絵文字は2文字）。画面の検査と `displayName` の切り詰めを、これに合わせた（data-model.md §2）
 
 ## 5. 実機の確認（手動）
 

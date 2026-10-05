@@ -28,7 +28,7 @@ Issue（1PR分）→ ブランチ → 実装・テスト → PR（Closes #番号
 - **mainに直接pushしない**。ブランチは `feature/#12-短い題名`、`fix/#12-…`、`docs/#12-…`
 - コミットは、日本語で、1行目に要点。例：`feat: イベント作成を追加 (#12)`。種類は `feat` / `fix` / `docs` / `test` / `refactor` / `chore`
 - PRの本文には、`Closes #番号`、変更の概要、確認した内容（テスト・dev）を書く。設計を変えたときは、変えた文書も書く
-- **マージの条件**：CI（型・Lint・単体テスト・ルールのテスト・ビルド）が通り、**devで動作を確認した**こと。ルール（`firestore.rules`）を変えるPRは、devにルールもデプロイして確認する（ルールは、プロジェクト全体に効く）
+- **マージの条件**：CI（型・Lint・単体テスト・ルールのテスト・結合テスト・ビルド）が通り、**devで動作を確認した**こと。ルール（`firestore.rules`）を変えるPRは、devにルールもデプロイして確認する（ルールは、プロジェクト全体に効く）
 - devの確認は、**devプロジェクトの本体（`maido-ookini-dev`）に、PRのブランチをデプロイ**して行う（プレビューチャンネルは、Googleログインの承認済みドメインの手間が増えるため、使わない）。当面は、手元から `firebase deploy -P dev` で行う。のちに、GitHub Actionsにする
 - 本番（`maido-ookini`）へのデプロイと、本番データへの操作は、**ユーザーの明示的な指示があるときだけ**行う
 
@@ -51,13 +51,14 @@ Issue（1PR分）→ ブランチ → 実装・テスト → PR（Closes #番号
 | `npm run build:dev` | 同上（devの設定値。`.env.development`）。devへのデプロイでは自動で行われるため、手元で確かめるときに使う |
 | `npm run typecheck` | 型チェック（`tsc -b`） |
 | `npm run lint` | Lint（ESLint。レイヤーの依存の向きも検査する） |
-| `npm test` | 単体テスト ＋ ルールのテスト |
-| `npm run test:unit` | 単体テスト（Vitest。`test/domain`） |
+| `npm test` | 単体テスト ＋ ルールのテスト ＋ データアクセスの結合テスト |
+| `npm run test:unit` | 単体テスト（Vitest。`test/domain`、`src/**/*.test.ts`） |
 | `npm run test:rules` | ルールのテスト（`test/rules`。Firestore Emulatorを起動して実行。Java 21 以上が必要） |
+| `npm run test:data` | データアクセスの結合テスト（`test/data`。Firestore Emulatorを起動して実行） |
 | `npx firebase deploy -P dev` | devへのデプロイ（Firebase CLIは devDependencies に入っている）。Hostingのビルドは、デプロイの直前に、devの設定値で自動で行われる（DESIGN.md §5「デプロイ」） |
 
 - Node.js は 24（`.nvmrc`）
-- CI（`.github/workflows/ci.yml`）は、PRとmainへのpushで、型・Lint・単体テスト・ルールのテスト・ビルドを実行する
+- CI（`.github/workflows/ci.yml`）は、PRとmainへのpushで、型・Lint・単体テスト・ルールのテスト・データアクセスの結合テスト・ビルドを実行する
 
 ## 作業の進め方
 

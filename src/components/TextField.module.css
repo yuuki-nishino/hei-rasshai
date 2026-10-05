@@ -27,6 +27,18 @@
   border-color: var(--color-focus);
 }
 
+/* iPhone の日付の欄は、中身が無いと高さが縮み、左寄せにならないため */
+.date {
+  display: block;
+  text-align: left;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.date::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 .invalid {
   border-color: var(--status-void-fg);
 }
