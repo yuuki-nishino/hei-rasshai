@@ -143,6 +143,10 @@ npx firebase deploy -P dev --only firestore:rules   # ルールだけ（ルー�
 
 - Googleログイン。永続化は `browserLocalPersistence`
 - ★U1：`signInWithPopup` / `signInWithRedirect` のどちらを使うかを決めるため、**Safariのタブ**での動作を、早めに実機（iPhone・Android）で確認する。リダイレクトを使う場合は、`authDomain` を、Hostingと同じドメインにする（ストレージの分離対策）
+  - **結果（#5）：ポップアップ（`signInWithPopup`）に決めた**。dev（`authDomain` は `maido-ookini-dev.firebaseapp.com` のまま）で、iPhoneのSafari（タブ）・パソコンのChromeとも、ログイン・読み込み直した後の保持・ログアウトができた。ポップアップを閉じたときも、何も表示されず、もう一度押せた
+  - ポップアップを閉じたことを、SDK が検知するまで、iPhoneで約3秒かかる。そのため、ログインのボタンは、ログイン中も押せるままにする（押し直すと、前のポップアップは取り消され、新しく開く）
+  - リダイレクトは使わない。`authDomain` が Hosting と別のドメインのとき、Safari のストレージの分離で、リダイレクトの結果を受け取れないことが知られているため、試していない。ホーム画面に追加したアプリ（M7・#20）で、ポップアップが動かなかったときに、`authDomain` を Hosting のドメインにして（Google の OAuth クライアントに、`https://<Hostingのドメイン>/__/auth/handler` を追加する）、リダイレクトを検討する
+- ★W2（`frame-ancestors 'self'` の影響）：ポップアップのログインは、`authDomain`（`firebaseapp.com`）のページを、別ウィンドウと `iframe` で開く。`frame-ancestors` は「この画面を、どこが埋め込めるか」の制限で、こちらが埋め込む側の `iframe` は制限しないため、影響しない。**dev の実機で、ログインできることを確認した（#5）**。`authDomain` を Hosting のドメインにした場合は、同じドメインの `iframe` になるため、`'self'` で許可される
 - ホーム画面に追加したアプリは、Safariとは保存領域が別のため、**そのアプリの中で**ログインが必要。ポップアップ／リダイレクトの動作、アプリを閉じて開き直したときと機内モードでのログイン保持を、実機で確認できてから、追加を勧める。それまでは、Safariのタブでの利用を前提にする
 - Safariのタブのまま使う場合、しばらく開かないと、保存領域が消されてログアウトされることがある。当日の数日前にもログイン状態を確認する運用にする（C2）
 - メンバー・招待・権限の設計は、[design/security-rules.md](./design/security-rules.md)
@@ -201,11 +205,11 @@ Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／
 
 | # | 内容 | 確認する場面 |
 |---|---|---|
-| U1 | Googleログイン（popup / redirect、`authDomain`）。Safariのタブはマイルストーン1、ホーム画面アプリは、追加を勧める前に確認 | マイルストーン1・7、実機 |
+| U1 | Googleログイン（popup / redirect、`authDomain`）。Safariのタブはマイルストーン1、ホーム画面アプリは、追加を勧める前に確認 | マイルストーン1・7、実機。**Safariのタブ：#5 で確認済み（ポップアップに決定。§6）**。ホーム画面アプリは M7 |
 | U4 | イベント削除（Cloud Functionsなしで、配下を消す）の件数・時間・中断時の動作 | マイルストーン8 |
 | R1〜R11 | ルールの検証項目（[security-rules.md](./design/security-rules.md) §5）。**R8（墓標の排他）が、確定フローの安全性の要** | マイルストーン1・Emulator |
 | W1 | Service Workerと `/s` の関係（お客様画面に影響しないこと） | マイルストーン5・7。**`/s` の配信は #6 で確認済み**（dev で、`/s`・`/s?e=…&o=…` がお客様用の `customer.html` を、`/join` などそれ以外がスタッフ用の `index.html` を返す。ヘッダーも付く）。Service Worker との関係は M7 |
-| W2 | `frame-ancestors 'self'` が、Googleログインに影響しないこと | マイルストーン1・実機 |
+| W2 | `frame-ancestors 'self'` が、Googleログインに影響しないこと | マイルストーン1・実機。**#5 で確認済み（ポップアップ。§6）** |
 | F1 | お客様画面の初回JavaScriptが、gzip後200KB以下か（Firestore SDKの大きさ）。#2の時点で、Preact＋Firestore（メモリキャッシュ・`getDoc` 1回）で、約137KB | マイルストーン5 |
 | N1 | 接続状態の推定（`fromCache` が10秒続いたらオフライン）が、実機で、遅すぎ・早すぎないか | マイルストーン7 |
 | M1 | Gmailの別名・Workspaceのエイリアスで、招待のメールアドレスが一致しないときの扱い | マイルストーン2・実機 |
