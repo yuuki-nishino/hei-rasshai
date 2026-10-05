@@ -91,6 +91,8 @@ export function watchMyEvents(
  * 1. members/{自分} を getDocFromServer で確かめる。あれば 'already'。permission-denied は「メンバーではない」。
  *    通信できなければ AppError('offline')（この取得が、オンラインの確認を兼ねる）
  * 2. メンバー作成＋招待の削除を1バッチで書く。招待が無い・期限切れ・別のアカウント・削除中のイベントは、AppError('permission')
+ * 書き込みが8秒で終わらなければ AppError('timeout')。送信待ちは端末に残り、つながり直したときに通ることがある。
+ * もう一度呼ぶと、1. で「すでにメンバー」と分かるため、二重にはならない
  */
 export async function joinEvent(eventId: string, user: AuthUser): Promise<'joined' | 'already'> {
   const memberRef = doc(db, 'events', eventId, 'members', user.uid);
@@ -106,7 +108,7 @@ export async function joinEvent(eventId: string, user: AuthUser): Promise<'joine
   batch.set(memberRef, { uid: user.uid, role: 'member', displayName: memberDisplayName(user), email, joinedAt: serverTimestamp() });
   batch.delete(doc(db, 'events', eventId, 'invites', email));
   try {
-    await batch.commit();
+    await withTimeout(batch.commit()); // 確認の後に通信が切れても、止まったままにしない（PR #33 のレビュー J1）
   } catch (e) {
     throw toAppError(e);
   }
@@ -115,7 +117,9 @@ export async function joinEvent(eventId: string, user: AuthUser): Promise<'joine
 
 /**
  * イベントを作る（オンライン必須。data-access.md §3.9）。イベント＋オーナーの members を1バッチで書き、eventId を返す。
- * creators に登録されていないアカウントは、AppError('permission')
+ * creators に登録されていないアカウントは、AppError('permission')。
+ * 書き込みが8秒で終わらなければ AppError('timeout')。送信待ちは端末に残り、つながり直したときに作成されることがある
+ * （もう一度作ると、二重になり得るため、画面は「一覧で確かめてから」と案内する）
  */
 export async function createEvent(input: EventInput, user: AuthUser): Promise<string> {
   const eventRef = doc(collection(db, 'events'));
@@ -130,7 +134,7 @@ export async function createEvent(input: EventInput, user: AuthUser): Promise<st
     joinedAt: serverTimestamp(),
   });
   try {
-    await batch.commit();
+    await withTimeout(batch.commit()); // 確認の後に通信が切れても、止まったままにしない（PR #33 のレビュー J1）
   } catch (e) {
     throw toAppError(e);
   }

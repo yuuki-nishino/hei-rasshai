@@ -1,6 +1,6 @@
 // 招待と参加（testing.md §4 #10・#23、security-rules.md §4、ADR-0003）
 import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { disableNetwork, Timestamp } from 'firebase/firestore';
+import { disableNetwork, enableNetwork, Timestamp } from 'firebase/firestore';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { authUser, closeUsers, createEnv, emailOf, setUser, waitFor } from './helpers';
 
@@ -10,6 +10,24 @@ vi.mock('../../src/lib/firebase/staff', async () => {
   return {
     get db() {
       return holder.db;
+    },
+  };
+});
+
+// 確認（getDocFromServer）の直後に通信が切れる場合を作るため、getDocFromServer の後に処理を差し込めるようにする（PR #33 のレビュー J1）
+const hooks = vi.hoisted(() => ({ afterServerRead: null as null | (() => Promise<void>) }));
+vi.mock('firebase/firestore', async (importOriginal) => {
+  const m = await importOriginal<typeof import('firebase/firestore')>();
+  return {
+    ...m,
+    getDocFromServer: async (...args: Parameters<typeof m.getDocFromServer>) => {
+      try {
+        return await m.getDocFromServer(...args);
+      } finally {
+        const hook = hooks.afterServerRead;
+        hooks.afterServerRead = null;
+        if (hook) await hook();
+      }
     },
   };
 });
@@ -133,6 +151,18 @@ describe('参加（joinEvent）', () => {
     });
     setUser(BOB);
     await expect(joinEvent('e1', authUser(BOB))).rejects.toMatchObject({ code: 'permission' });
+  });
+
+  it('J1：確認の直後に通信が切れると、8秒で timeout になる（止まったままにならない）。送信待ちは、つながり直すと通る', async () => {
+    await seedInvite(emailOf(BOB), hoursAgo(1));
+    const db = setUser(BOB);
+    hooks.afterServerRead = () => disableNetwork(db);
+    await expect(joinEvent('e1', authUser(BOB))).rejects.toMatchObject({ code: 'timeout' });
+    expect(await read(`events/e1/members/${BOB}`)).toBeUndefined();
+    // 既知の制約：送信待ちは端末に残り、つながり直したときに送られる。もう一度呼ぶと、すでにメンバーと分かる
+    await enableNetwork(db);
+    await vi.waitFor(async () => expect(await read(`events/e1/members/${BOB}`)).toBeDefined(), { timeout: 8000 });
+    expect(await joinEvent('e1', authUser(BOB))).toBe('already');
   });
 
   it('#23：オフラインなら、offline で失敗し、書き込みは溜まらない', async () => {

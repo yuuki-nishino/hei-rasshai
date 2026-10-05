@@ -16,6 +16,7 @@ import styles from './InvitePanel.module.css';
 
 function messageOf(e: unknown): string {
   if (e instanceof AppError && e.code === 'offline') return '通信が必要です。電波を確認してから、もう一度押してください';
+  if (e instanceof AppError && e.code === 'timeout') return '送れていません。通信が戻ると、反映されることがあります。招待中の一覧を確かめてください';
   if (e instanceof AppError && e.code === 'permission') return '招待できませんでした。オーナーだけが招待できます（削除中のイベントでは、招待できません）';
   return 'うまくいきませんでした。時間をおいて、もう一度押してください';
 }

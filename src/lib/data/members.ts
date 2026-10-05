@@ -2,7 +2,7 @@
 import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/staff';
 import { toAppError, type AppError } from './errors';
-import { assertOnline } from './online';
+import { assertOnline, withTimeout } from './online';
 import type { Invite, Unsubscribe } from './types';
 
 /** 招待の一覧（オーナー用。発行の新しい順） */
@@ -30,7 +30,7 @@ export async function createInvite(eventId: string, email: string, uid: string):
   const ref = doc(db, 'events', eventId, 'invites', email);
   await assertOnline(ref);
   try {
-    await setDoc(ref, { createdBy: uid, createdAt: serverTimestamp() });
+    await withTimeout(setDoc(ref, { createdBy: uid, createdAt: serverTimestamp() })); // 時間切れは timeout（PR #33 のレビュー J1）
   } catch (e) {
     throw toAppError(e);
   }
@@ -41,7 +41,7 @@ export async function cancelInvite(eventId: string, email: string): Promise<void
   const ref = doc(db, 'events', eventId, 'invites', email);
   await assertOnline(ref);
   try {
-    await deleteDoc(ref);
+    await withTimeout(deleteDoc(ref));
   } catch (e) {
     throw toAppError(e);
   }

@@ -136,7 +136,7 @@ type OrderAction = 'ready' | 'backToPreparing' | 'done' | 'backToReady' | 'cance
 
 - 対象：`createEvent`、`joinEvent`、`createInvite`・`cancelInvite`、`saveClosing`、`deleteEventDeep`、`removeMember`
 - `assertOnline(ref)`（`lib/data/online.ts`）：`getDocFromServer(ref)` を実行する。`unavailable`・タイムアウト（8秒）なら、`AppError('offline')`（「通信が必要です」）を投げて、**書かない**。`permission-denied`・`not-found` は、サーバーに届いた証拠なので、通信ありとして扱う（`createEvent` のように、まだ存在しない文書でも使える）
-- 確認の直後に、通信が切れることは、あり得る。そのときは、書き込みが溜まるが、確認と書き込みの間は短く、頻度が低いため、既知の制約とする。画面は、接続状態（§6）がオフラインの間は、これらの操作のボタンを無効にする。ただし、接続状態の判定は、Shellの購読（イベントを選んでいる間）に依存する。**イベント一覧と `/join` では、`navigator.onLine` だけで判定する**（`assertOnline` があるので、判定が粗くても、書き込みは溜まらない）
+- 確認の直後に、通信が切れることは、あり得る。そのときは、書き込みが溜まるが、確認と書き込みの間は短く、頻度が低いため、既知の制約とする。**書き込みの完了は8秒で打ち切り、`AppError('timeout')`（「送れていません」）にする**（`withTimeout`。打ち切らないと、画面が止まったままになる。[PR #33 のレビュー](../reviews/pr-33-invite-join-review.md) J1）。打ち切っても、送信待ちは端末に残り、つながり直したときに通ることがある。画面は、それを前提に案内する（参加：「もう一度」は、まずメンバーかを確かめるため二重にならない。イベントの作成：押し直すと二重になり得るため、「一覧で確かめてから」。招待：同じ文書の上書きのため、二重にならない）。画面は、接続状態（§6）がオフラインの間は、これらの操作のボタンを無効にする。ただし、接続状態の判定は、Shellの購読（イベントを選んでいる間）に依存する。**イベント一覧と `/join` では、`navigator.onLine` だけで判定する**（`assertOnline` があるので、判定が粗くても、書き込みは溜まらない）
 - 調理画面の操作（`transitionOrder`、`changePayment`）と、メニュー・イベントの編集は、**対象外**（オフラインでも受け付け、`trackWrite` で数える。メニューは、`trackWrite` の対象外）
 
 **`displayName` の決め方**（`createEvent`・`joinEvent`。`lib/domain/event.ts` の `memberDisplayName`）：Googleの表示名（`user.displayName`）を、前後の空白を除いて使う。`null`・空のときは、メールの `@` より前を使う。**60文字を超える場合は、60文字に切り詰める**（ルールが、61文字以上を拒否するため。拒否されると、「招待されていません」と誤った案内になる）。文字数は、ルールと同じく UTF-16 の単位で数え、絵文字の途中では切らない（data-model.md §2 の注）

@@ -11,7 +11,7 @@ import { leaveJoin } from '../../state/route';
 import { logout } from '../auth/logout';
 import styles from './JoinPage.module.css';
 
-type State = 'checking' | 'denied' | 'offline' | 'error';
+type State = 'checking' | 'denied' | 'offline' | 'timeout' | 'error';
 
 export function JoinPage({ eventId }: { eventId: string }) {
   const [state, setState] = useState<State>('checking');
@@ -33,7 +33,7 @@ export function JoinPage({ eventId }: { eventId: string }) {
         if (cancelled) return;
         console.error(e);
         const code = e instanceof AppError ? e.code : 'unknown';
-        setState(code === 'permission' ? 'denied' : code === 'offline' ? 'offline' : 'error');
+        setState(code === 'permission' ? 'denied' : code === 'offline' || code === 'timeout' ? code : 'error');
       },
     );
     return () => {
@@ -86,7 +86,9 @@ export function JoinPage({ eventId }: { eventId: string }) {
             </div>
           </>
         ) : (
-          <ErrorView title={state === 'offline' ? '通信が必要です。電波を確認してください' : '確認できませんでした'}>
+          <ErrorView title={state === 'offline' ? '通信が必要です。電波を確認してください' : state === 'timeout' ? '送れていません' : '確認できませんでした'}>
+            {/* 時間切れ：送信待ちが端末に残り、つながり直したときに参加が済むことがある。「もう一度」は、まずメンバーかを確かめるので、二重にならない */}
+            {state === 'timeout' && <p>電波の良い場所で「もう一度」を押してください。通信が戻ると、参加が済んでいることがあります</p>}
             <div class={styles.actions}>
               {retry}
               {toList}
