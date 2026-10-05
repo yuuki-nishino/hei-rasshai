@@ -9,7 +9,7 @@ import { initialConfirmState, type ConfirmContext, type ConfirmedOrder, type Con
 import { toDay } from '../lib/domain/day';
 import { parseTendered } from '../lib/domain/order';
 import { cartLines, cartTotal, clearCart, payment, qr, tenderedText } from './cart';
-import { createConfirmRunner, type PendingRecord } from './confirmRunner';
+import { createConfirmRunner, type InflightTracker, type PendingRecord } from './confirmRunner';
 import { currentEventId } from './event';
 import { readStorage, writeStorage } from './storage';
 
@@ -36,6 +36,15 @@ export function readPending(eventId: string): PendingRecord | null {
 
 let runner: ReturnType<typeof createConfirmRunner> | null = null;
 let runnerKey = '';
+
+// 裏で動いている確かめる処理は、ランナー（イベント）をまたいで1つとして数える（PR #41 のレビュー P2）。
+// 終わったら、「確認中です」を消す（レビュー P1）
+const tracker: InflightTracker = {
+  current: null,
+  onSettled: () => {
+    recheckBusy.value = false;
+  },
+};
 
 function runnerFor(eventId: string, uid: string) {
   const key = `${eventId}/${uid}`;
@@ -68,6 +77,8 @@ function runnerFor(eventId: string, uid: string) {
           confirmState.value = s;
         },
       },
+      undefined,
+      tracker,
     );
   }
   return runner;
@@ -77,6 +88,14 @@ function runnerFor(eventId: string, uid: string) {
  * イベントに入ったとき（と、ログインし直したとき）：端末に確定の途中の記録が残っていれば、確かめる（order-confirm.md §5.3）
  */
 export function resumePending(eventId: string, uid: string): void {
+  // 前の（離れたイベント・作り直す前のランナーの）裏の処理が終わるまで待つ。重なると、書き込みの完了前に確かめて
+  // 「登録されていません」と誤ることがある（PR #41 のレビュー P2）
+  if (tracker.current) {
+    void tracker.current.finally(() => {
+      if (currentEventId.peek() === eventId) resumePending(eventId, uid);
+    });
+    return;
+  }
   const r = runnerFor(eventId, uid);
   const p = readPending(eventId);
   if (p) r.restore(p);

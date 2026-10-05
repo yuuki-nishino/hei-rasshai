@@ -1,7 +1,7 @@
 // 確定フローを動かす部分（8秒の時間切れ・遅れた結果・やめる）。偽のタイマーで確かめる（testing.md §2 の confirmReducer）
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialConfirmState, type ConfirmContext, type ConfirmedOrder, type ConfirmState } from '../lib/domain/confirmFlow';
-import { CONFIRM_TIMEOUT_MS, createConfirmRunner, type ConfirmDeps, type PendingRecord } from './confirmRunner';
+import { CONFIRM_TIMEOUT_MS, createConfirmRunner, type ConfirmDeps, type InflightTracker, type PendingRecord } from './confirmRunner';
 
 const ctx: ConfirmContext = {
   orderId: 'o1',
@@ -22,7 +22,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function setup(deps: Partial<ConfirmDeps>) {
+function setup(deps: Partial<ConfirmDeps>, tracker?: InflightTracker) {
   let state: ConfirmState = initialConfirmState;
   const saved: (PendingRecord | null)[] = [];
   const runner = createConfirmRunner(
@@ -35,6 +35,8 @@ function setup(deps: Partial<ConfirmDeps>) {
       ...deps,
     },
     { get: () => state, set: (s) => (state = s) },
+    undefined,
+    tracker,
   );
   return { runner, state: () => state, saved };
 }
@@ -303,6 +305,39 @@ describe('createConfirmRunner', () => {
       await flush();
       expect(calls).toBe(2);
       expect(state()).toMatchObject({ kind: 'done' });
+    });
+
+    it('裏の処理が終わったら onSettled を呼ぶ（「確認中です」を消す。PR #41 のレビュー P1）', async () => {
+      const onSettled = vi.fn();
+      const tracker: InflightTracker = { current: null, onSettled };
+      const { runner, state } = setup(
+        { findOrder: () => new Promise((_, reject) => setTimeout(() => reject({ code: 'offline' }), 10_000)) },
+        tracker,
+      );
+      runner.restore({ ctx, abandoning: false });
+      await vi.advanceTimersByTimeAsync(CONFIRM_TIMEOUT_MS);
+      expect(runner.recheck()).toBe('busy');
+      expect(onSettled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(2000); // 裏の処理が、unverifiable のまま終わる
+      expect(state().kind).toBe('unverifiable');
+      expect(onSettled).toHaveBeenCalledTimes(1);
+    });
+
+    it('目印をランナーの外に持つと、ランナーを作り直しても、前の裏の処理が終わるまで復元しない（レビュー P2）', async () => {
+      const tracker: InflightTracker = { current: null };
+      const slow = deferred<ConfirmedOrder>();
+      const a = setup({ confirmOrder: () => slow.promise }, tracker);
+      a.runner.submit(ctx); // 書き込みが遅い間に、イベントを離れる（ランナー a を捨てる）
+      const findOrder = vi.fn(async () => order);
+      const b = setup({ findOrder }, tracker); // 戻って、新しいランナー
+      expect(b.runner.restore({ ctx, abandoning: false })).toBe(false);
+      expect(findOrder).not.toHaveBeenCalled();
+      slow.resolve(order); // 前の書き込みが終わる
+      await flush();
+      expect(tracker.current).toBeNull();
+      expect(b.runner.restore({ ctx, abandoning: false })).toBe(true);
+      await flush();
+      expect(b.state()).toMatchObject({ kind: 'done', recovered: true });
     });
 
     it('unverifiable でなければ、kick は何もしない', () => {

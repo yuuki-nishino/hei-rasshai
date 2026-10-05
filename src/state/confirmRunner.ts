@@ -45,7 +45,22 @@ function race<T>(p: Promise<T>, ms: number): Promise<T | typeof TIMEOUT> {
   return Promise.race([p, new Promise<typeof TIMEOUT>((r) => (timer = setTimeout(() => r(TIMEOUT), ms)))]).finally(() => clearTimeout(timer));
 }
 
-export function createConfirmRunner(deps: ConfirmDeps, store: { get(): ConfirmState; set(s: ConfirmState): void }, timeoutMs = CONFIRM_TIMEOUT_MS) {
+/**
+ * 裏で動いている、確かめる処理の目印。ランナーの外に持てるようにする：イベントを離れて戻り、ランナーを作り直しても、
+ * 前のランナーの裏の処理が終わるまで、次の確認を始めないため（PR #41 のレビュー P2）。
+ * onSettled：裏の処理が終わったとき（「確認中です」の表示を消すため。レビュー P1）
+ */
+export interface InflightTracker {
+  current: Promise<unknown> | null;
+  onSettled?: () => void;
+}
+
+export function createConfirmRunner(
+  deps: ConfirmDeps,
+  store: { get(): ConfirmState; set(s: ConfirmState): void },
+  timeoutMs = CONFIRM_TIMEOUT_MS,
+  tracker: InflightTracker = { current: null },
+) {
   const dispatch = (e: ConfirmEvent) => {
     const before = store.get();
     const after = confirmReducer(before, e);
@@ -61,12 +76,14 @@ export function createConfirmRunner(deps: ConfirmDeps, store: { get(): ConfirmSt
   };
 
   /** 裏で動いている、確かめる処理（終わるまで、次の確認を始めない） */
-  let inflight: Promise<unknown> | null = null;
   function track<T>(p: Promise<T>): Promise<T> {
-    const tracked = p.finally(() => {
-      if (inflight === tracked) inflight = null;
+    const tracked: Promise<unknown> = p.finally(() => {
+      if (tracker.current === tracked) {
+        tracker.current = null;
+        tracker.onSettled?.();
+      }
     });
-    inflight = tracked;
+    tracker.current = tracked;
     tracked.catch(() => {}); // 結果は、呼んだ側で扱う
     return p;
   }
@@ -174,7 +191,7 @@ export function createConfirmRunner(deps: ConfirmDeps, store: { get(): ConfirmSt
     },
     /** 確認できないところから、手動で確かめ直す。裏の処理が終わっていなければ 'busy'（「確認中です」） */
     recheck(): 'started' | 'busy' | 'ignored' {
-      if (inflight) return 'busy';
+      if (tracker.current) return 'busy';
       const before = store.get();
       dispatch({ type: 'recheck' });
       if (store.get() === before) return 'ignored';
@@ -183,11 +200,11 @@ export function createConfirmRunner(deps: ConfirmDeps, store: { get(): ConfirmSt
     },
     /** 自動のきっかけ（15秒ごと・online）：確認できない状態で、裏の処理が無ければ、確かめ直す */
     kick(): void {
-      if (!inflight && store.get().kind === 'unverifiable') this.recheck();
+      if (!tracker.current && store.get().kind === 'unverifiable') this.recheck();
     },
     /** 端末に残っていた pending から復元する（idle のときだけ） */
     restore(p: PendingRecord): boolean {
-      if (inflight) return false;
+      if (tracker.current) return false;
       const before = store.get();
       dispatch({ type: 'restore', ctx: p.ctx, abandoning: p.abandoning });
       if (store.get() === before) return false;
@@ -203,7 +220,7 @@ export function createConfirmRunner(deps: ConfirmDeps, store: { get(): ConfirmSt
     },
     /** 裏で、確かめる処理が動いているか */
     busy(): boolean {
-      return inflight !== null;
+      return tracker.current !== null;
     },
   };
 }
