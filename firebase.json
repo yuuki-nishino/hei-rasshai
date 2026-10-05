@@ -5,6 +5,7 @@
   },
   "hosting": {
     "public": "dist",
+    "predeploy": ["npm run typecheck", "node scripts/build.mjs --project \"$GCLOUD_PROJECT\""],
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       { "source": "/s", "destination": "/customer.html" },

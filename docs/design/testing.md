@@ -135,7 +135,7 @@
 
 ## 5. 実機の確認（手動）
 
-端末：iPhone（Safari）、Android（Chrome）、タブレット。**開発用のFirebaseプロジェクト**（Hostingのプレビューチャンネル）で行う。
+端末：iPhone（Safari）、Android（Chrome）、タブレット。**開発用のFirebaseプロジェクトの本体**（`https://maido-ookini-dev.web.app`。手順は DESIGN.md §5「デプロイ」）で行う。
 
 ### 5.1 マイルストーンごと
 | マイルストーン | 確認 |

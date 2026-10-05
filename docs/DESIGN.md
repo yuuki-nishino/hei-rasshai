@@ -102,7 +102,7 @@ maido-ookini/
 | 環境 | 用途 | Firebase |
 |---|---|---|
 | ローカル | 開発。Emulator（Auth・Firestore）で、本番データに触れない | Emulator |
-| 開発用プロジェクト（`maido-ookini-dev`） | **実機での確認**（Googleログインは、実際のFirebaseが必要。Hostingのプレビューチャンネルで配信） | Spark |
+| 開発用プロジェクト（`maido-ookini-dev`） | **PRの確認・実機での確認**（Googleログインは、実際のFirebaseが必要）。PRのブランチを、devの本体（`https://maido-ookini-dev.web.app`）にデプロイする。プレビューチャンネルは、URLごとに、Authの承認済みドメインの追加が要るため、使わない | Spark |
 | 本番 | イベントで使う | Spark（`maido-ookini`） |
 
 - 設定値は `.env.*` の `VITE_FIREBASE_*`（項目は `.env.example`）。`VITE_USE_EMULATOR=true` のときだけ、Emulatorに接続する。Firebaseの設定値は、秘密ではないが、リポジトリには入れない（`.env.development`・`.env.production` はgit管理外）
@@ -116,8 +116,27 @@ maido-ookini/
 3. Authenticationで、Googleログインを有効化。承認済みドメインに、Hostingのドメインを追加
 4. ウェブアプリを登録し、設定値を `.env` に入れる
 5. `creators/{許可するメールアドレス}` を、コンソールで作成する（最初は運営者自身）。**IDは小文字で登録する**（ルールは、ログイン中のメールを `lower()` にして比較するため、大文字を含むIDには一致しない）
-6. `firebase deploy --only firestore:rules,firestore:indexes,hosting`
+6. `npx firebase deploy -P <dev か prod>`（ルール・インデックス・Hosting。下の「デプロイ」）
 7. 当日までに、スタッフの端末でログインする（C2）
+
+### デプロイ（#6）
+devは、PRのたびに、手元から行う（のちに GitHub Actions にする）。本番は、イベントの前に、**main から**、手動で行う（ユーザーの明示的な指示があるときだけ）。
+
+```sh
+git switch feature/#12-…          # 確認したい PR のブランチ
+npm ci                             # 依存を、lock どおりにする
+npx firebase deploy -P dev         # ルール・インデックス・Hosting をまとめて
+npx firebase deploy -P dev --only firestore:rules   # ルールだけ（ルールを変えた PR で、画面がまだ無いとき）
+```
+
+- **ビルドは、デプロイの直前に、自動で行われる**（`firebase.json` の `hosting.predeploy`）。`npm run typecheck` の後、`node scripts/build.mjs --project $GCLOUD_PROJECT` が、デプロイ先に対応する `.env`（dev → `.env.development`、本番 → `.env.production`）でビルドする。手で `npm run build:dev` を忘れたり、別の設定値の `dist/` を、そのままデプロイしたりすることがない
+- `.env` の取り違えを防ぐため、`.env.{mode}` の `VITE_FIREBASE_PROJECT_ID` が、デプロイ先と違えば、ビルドを止める。対応表に無いプロジェクトへのデプロイも止める（`scripts/build.mjs`）
+- dev は、1つの環境を、すべての PR で共有する。**最後にデプロイした PR の状態**になる。ルールも、プロジェクト全体に効く。そのため、別の PR を確かめるときは、そのブランチで、デプロイし直す
+- デプロイの後に確かめること：
+  - `https://maido-ookini-dev.web.app/`（スタッフ用）と `/s`（お客様用）が開く
+  - 応答のヘッダー（`Referrer-Policy`・`X-Content-Type-Options`・`Content-Security-Policy: frame-ancestors 'self'`・`X-Frame-Options`）。`curl -sI https://maido-ookini-dev.web.app/s`
+  - ルールを変えた PR では、反映されたルールが、手元の `firestore.rules` と一致すること
+- Authの承認済みドメイン：`maido-ookini-dev.web.app`・`maido-ookini-dev.firebaseapp.com`・`localhost` は、プロジェクトの作成時に、自動で入っている（#6 で確認）。独自ドメインを使うときだけ、追加する
 
 ## 6. 認証
 
