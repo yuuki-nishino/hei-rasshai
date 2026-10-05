@@ -35,10 +35,11 @@ export function mergeClearMark(mark: ClearPendingMark | null, events: readonly s
 
 /**
  * サーバーで、もう一度メンバーだと確かめられたイベントを、印から外す（参加し直した場合。PR #34 のレビュー K3）。
- * 空になったら null（消去は要らない）
+ * 空になったら null（消去は要らない）。何も外さなければ、同じ mark を返す（保存し直さなくてよいと分かるように）
  */
 export function pruneClearMark(mark: ClearPendingMark | null, memberOf: readonly string[]): ClearPendingMark | null {
   if (!mark) return null;
   const events = mark.events.filter((id) => !memberOf.includes(id));
+  if (events.length === mark.events.length) return mark;
   return events.length === 0 ? null : { ...mark, events };
 }

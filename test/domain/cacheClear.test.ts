@@ -34,6 +34,10 @@ describe('pruneClearMark（PR #34 のレビュー K3）', () => {
   it('もう一度メンバーになったイベントを、印から外す。時刻は残す', () => {
     expect(pruneClearMark({ since: 1, events: ['e1', 'e2'] }, ['e1', 'e3'])).toEqual({ since: 1, events: ['e2'] });
   });
+  it('何も外さなければ、同じオブジェクトを返す（再レビュー K5）', () => {
+    const mark = { since: 1, events: ['e1'] };
+    expect(pruneClearMark(mark, ['e2'])).toBe(mark);
+  });
   it('空になったら null。印が無ければ null', () => {
     expect(pruneClearMark({ since: 1, events: ['e1'] }, ['e1'])).toBeNull();
     expect(pruneClearMark(null, ['e1'])).toBeNull();

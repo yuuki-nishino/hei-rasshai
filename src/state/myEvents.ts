@@ -40,6 +40,9 @@ export function subscribeMyEvents(uid: string): () => void {
   return watchMyEvents(
     uid,
     (events, meta) => {
+      // 外れたイベント・参加し直したイベントを、先に印へ反映する（参加し直した直後の一覧で、隠さないように。PR #34 の再レビュー K4）。
+      // 新しく外れたイベントは、もともと events に無いため、先に呼んでも絞り込みは変わらない
+      if (!meta.fromCache) onServerMembership(meta.memberOf);
       // 消去待ちの、外れたイベントは、一覧に出さず、開けない（data-access.md §8）
       const hidden = clearMark.peek()?.events ?? [];
       myEvents.value = { events: events.filter((e) => !hidden.includes(e.id)), fromCache: meta.fromCache };
@@ -47,8 +50,6 @@ export function subscribeMyEvents(uid: string): () => void {
       const current = currentEventId.peek();
       // 選んでいるイベントから外れていたら、選択を外して一覧に戻す（消された・外された。レビュー E1）
       if (isSelectionGone(current, meta) || (current && hidden.includes(current))) selectEvent(null);
-      // 外れたイベントがあれば、端末のキャッシュの消去を始める（#9）
-      if (!meta.fromCache) onServerMembership(meta.memberOf);
     },
     (e) => (myEventsError.value = e),
   );
