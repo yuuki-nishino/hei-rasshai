@@ -142,6 +142,8 @@ describe('addMenuItemsBulk（#11）', () => {
       { line: 2, name: 'b', price: 1 },
     ];
     await expect(addMenuItemsBulk('e1', lines, items)).rejects.toMatchObject({ code: 'validation' });
+    // 1件も書かれていない（PR #37 のレビュー B5）
+    expect(await watchUntil(() => true).result).toEqual([]);
     await expect(addMenuItemsBulk('e1', lines.slice(0, 1), [])).resolves.toBeUndefined();
   });
 });
