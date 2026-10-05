@@ -145,6 +145,7 @@
   - **同時の確定は、後のコミットが `permission-denied` になる**（4）。`confirmOrder` に、同じ `orderId` でのやり直しを入れた（order-confirm.md §5.1）。やり直しを外すと4が失敗することを確かめた
   - 2台からの並行の操作は、`asUser`（`AsyncLocalStorage`）で、処理ごとに利用者の db を持たせる（やり直しなどで、後から db を読み直しても、その処理の利用者のまま）
   - 7（確定とやめるの並行）を5回くり返し、注文と墓標が並存しないことを確かめた（★R8 の補助）。8秒の時間切れ・遅れた結果の無視・やめるの流れは、`state/confirmRunner.test.ts` で偽のタイマーで確かめた
+- #14 の結果：17・19・20・27 を `test/data/confirmFlow.test.ts` で確認した（動かす部分 `confirmRunner` に、本物のデータアクセスをつなぎ、pending はメモリに持つ）。15秒ごとの自動の再確認・同時実行（裏の処理が終わるまで、次を始めない）・pending の保存と消去の時機は、`state/confirmRunner.test.ts` で、偽のタイマーで確かめた。28 は #9 で確認済み
 - #7 で分かったこと：ルールの文字数は UTF-16 の単位（絵文字は2文字）。画面の検査と `displayName` の切り詰めを、これに合わせた（data-model.md §2）
 
 ## 5. 実機の確認（手動）

@@ -39,7 +39,7 @@ describe('confirmReducer', () => {
 
   it('やめる → 確認できない → もう一度確認：void-or-find をやり直す', () => {
     const s = run({ type: 'submit', ctx }, { type: 'failed', reason: 'offline' }, { type: 'abandon' }, { type: 'unverifiable' });
-    expect(s).toEqual({ kind: 'unverifiable', ctx });
+    expect(s).toEqual({ kind: 'unverifiable', ctx, via: 'abandon' });
     expect(canSubmit(s)).toBe(false); // 確認できない間は、次の注文を確定できない
     expect(confirmReducer(s, { type: 'recheck' })).toEqual({ kind: 'abandoning', ctx });
   });
@@ -64,6 +64,24 @@ describe('confirmReducer', () => {
     const s = run({ type: 'submit', ctx }, { type: 'failed', reason: 'permission' }, { type: 'abandon' }, { type: 'blocked' });
     expect(s).toEqual({ kind: 'idle', notice: 'blocked' });
     expect(confirmReducer(s, { type: 'close' })).toEqual(initialConfirmState);
+  });
+
+  it('#14 復元：abandoning なら、やめる処理の続き。そうでなければ確認（checking）', () => {
+    expect(confirmReducer(initialConfirmState, { type: 'restore', ctx, abandoning: true })).toEqual({ kind: 'abandoning', ctx });
+    expect(confirmReducer(initialConfirmState, { type: 'restore', ctx, abandoning: false })).toEqual({ kind: 'checking', ctx });
+    // idle 以外では、復元しない（確定の途中など）
+    const submitting = run({ type: 'submit', ctx });
+    expect(confirmReducer(submitting, { type: 'restore', ctx, abandoning: false })).toBe(submitting);
+  });
+
+  it('#14 確認（checking）：注文あり → done（recovered）、墓標あり → idle（voided）、どちらも無し → decide、確認できない → unverifiable（find）', () => {
+    const checking: ConfirmState = { kind: 'checking', ctx };
+    expect(confirmReducer(checking, { type: 'found', order })).toEqual({ kind: 'done', ctx, order, recovered: true });
+    expect(confirmReducer(checking, { type: 'voided' })).toEqual({ kind: 'idle', notice: 'voided' });
+    expect(confirmReducer(checking, { type: 'missing' })).toEqual({ kind: 'decide', ctx });
+    const u = confirmReducer(checking, { type: 'unverifiable' });
+    expect(u).toEqual({ kind: 'unverifiable', ctx, via: 'find' });
+    expect(confirmReducer(u, { type: 'recheck' })).toEqual({ kind: 'checking', ctx }); // 同じ確かめ方をやり直す
   });
 
   it('decide（#14 の復元）：もう一度確定する（同じ orderId）・やめる', () => {

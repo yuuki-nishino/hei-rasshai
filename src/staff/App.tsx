@@ -1,4 +1,5 @@
 // スタッフ画面のルート。Shell は、後のIssueで足す（screens.md §1.2）
+import { useEffect } from 'preact/hooks';
 import { Button } from '../components/Button';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Noren } from '../components/Noren';
@@ -7,6 +8,17 @@ import { tabId, Tabs } from '../components/Tabs';
 import { formatDayRange } from '../lib/domain/day';
 import { currentUser } from '../state/auth';
 import { cacheClearAsk, confirmCacheClear } from '../state/cacheClear';
+import {
+  abandonConfirm,
+  closeConfirm,
+  confirmState,
+  dismissConfirm,
+  recheckBusy,
+  recheckConfirm,
+  resubmitWithNewId,
+  resumePending,
+  retryConfirm,
+} from '../state/confirm';
 import { currentEventId, selectEvent } from '../state/event';
 import { logoutConfirm, logoutNow, requestLogout } from '../state/logout';
 import { currentEvent } from '../state/myEvents';
@@ -17,6 +29,7 @@ import { AuthGate } from './auth/AuthGate';
 import { EventGate } from './event/EventGate';
 import { JoinPage } from './join/JoinPage';
 import { MenuPage } from './menu/MenuPage';
+import { ConfirmFlowDialog } from './order/ConfirmFlowDialog';
 import { OrderPage } from './order/OrderPage';
 import { InvitePanel } from './members/InvitePanel';
 import { MembersPanel } from './members/MembersPanel';
@@ -34,6 +47,12 @@ function EventHome() {
   const uid = currentUser.value?.uid;
   const isOwner = !!event && !!uid && event.ownerUid === uid;
   const tab = currentTab.value;
+
+  // イベントに入ったら、前回の確定の途中の記録（pending）が残っていないか確かめる（order-confirm.md §5.3）
+  useEffect(() => {
+    if (eventId && uid) resumePending(eventId, uid);
+  }, [eventId, uid]);
+
   return (
     <>
       <Noren
@@ -67,6 +86,21 @@ function EventHome() {
           )}
         </div>
       </main>
+
+      {/* 確定の流れ。どのタブを開いていても出す（前の注文の確認中は、ほかの操作より先に見せる） */}
+      {eventId && uid && (
+        <ConfirmFlowDialog
+          state={confirmState.value}
+          recheckBusy={recheckBusy.value}
+          eventId={eventId}
+          onRetry={() => retryConfirm(eventId, uid)}
+          onAbandon={() => abandonConfirm(eventId, uid)}
+          onRecheck={() => recheckConfirm(eventId, uid)}
+          onResubmit={() => resubmitWithNewId(eventId, uid)}
+          onDismiss={dismissConfirm}
+          onClose={closeConfirm}
+        />
+      )}
     </>
   );
 }
