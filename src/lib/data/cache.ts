@@ -20,7 +20,9 @@ export async function hasPendingWrites(ms = 1500): Promise<boolean> {
 
 /**
  * Firestore を終了し、端末のキャッシュを丸ごと消す（未送信も消える）。この後は db を使えないため、呼んだ側で画面を再読み込みする。
- * 別のタブが開いていると消せない（failed-precondition → AppError('conflict')）
+ * 別のタブが開いていても、失敗しない：SDK（persistentMultipleTabManager）は、IndexedDB の削除の知らせ（versionchange）を受けると、
+ * そのタブの Firestore を終了させる。終了したタブは使えなくなるため、呼ぶ前に、ほかのタブへ知らせて再読み込みさせる
+ * （state/cacheClear.ts の BroadcastChannel。PR #34 のレビュー K1）。失敗は、IndexedDB そのもののエラーなど
  */
 export async function clearLocalCache(): Promise<void> {
   try {

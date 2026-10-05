@@ -2,15 +2,18 @@
 // - 外れたことは、サーバーで確かめた自分の members（memberOf）から、前に見ていたイベントが消えたことで知る
 // - 未送信が無ければ、すぐ消して再読み込み。あれば印（hei:clearPending）を残して持ち越し、一覧に戻ったとき・次の起動時に試す
 // - 24時間たっても未送信が残るときは、消してよいか確かめる（cacheClearAsk）
+// - 消す前に、ほかのタブへ知らせて再読み込みさせる（消去で、ほかのタブの Firestore は終了させられるため。PR #34 のレビュー K1）
+// - 消去に失敗したら、このセッションの間は、自動では試さない（再読み込みが止まらなくなるため。レビュー K2）
 import { signal } from '@preact/signals';
 import { clearLocalCache, hasPendingWrites } from '../lib/data/cache';
-import { decideCacheClear, lostMemberships, mergeClearMark, type ClearPendingMark } from '../lib/domain/cacheClear';
+import { decideCacheClear, lostMemberships, mergeClearMark, pruneClearMark, type ClearPendingMark } from '../lib/domain/cacheClear';
 import { currentEventId } from './event';
-import { readStorage, writeStorage } from './storage';
+import { readSession, readStorage, writeSession, writeStorage } from './storage';
 
 const MARK_KEY = 'hei:clearPending';
 const KNOWN_KEY = 'hei:knownEvents'; // これまでにサーバーで確かめた、自分のイベント（この端末のキャッシュにあり得るもの）
-const CLEAR_ON_START_KEY = 'hei:clearOnStart'; // ログアウトで消せなかったとき（別のタブが開いていた）、次の起動時に消す
+const CLEAR_ON_START_KEY = 'hei:clearOnStart'; // ログアウトで消せなかったとき、次の起動時に消す
+const FAILED_KEY = 'hei:clearFailed'; // sessionStorage：このセッションで、消去に失敗した（自動では、もう試さない）
 
 function readJson<T>(key: string): T | null {
   try {
@@ -31,8 +34,16 @@ function setMark(mark: ClearPendingMark | null): void {
   writeStorage(MARK_KEY, mark && JSON.stringify(mark));
 }
 
+// ほかのタブへの知らせ。消去すると、ほかのタブの Firestore は終了させられ、黙って使えなくなる。知らせを受けたら、再読み込みする
+const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('hei-cache');
+if (channel) channel.onmessage = (e: MessageEvent) => e.data === 'clearing' && location.reload();
+
 /** サーバーで確かめた memberOf が届いたら呼ぶ。外れたイベントがあれば、消去を始める */
 export function onServerMembership(memberOf: string[]): void {
+  // 参加し直したイベントは、印から外す（レビュー K3）
+  const pruned = pruneClearMark(clearMark.peek(), memberOf);
+  if (pruned !== clearMark.peek()) setMark(pruned);
+
   const known = readJson<string[]>(KNOWN_KEY) ?? [];
   const lost = lostMemberships(known, memberOf);
   writeStorage(KNOWN_KEY, JSON.stringify(memberOf));
@@ -45,10 +56,10 @@ export function onServerMembership(memberOf: string[]): void {
 
 let running = false;
 
-/** 印があれば、消去を試す（未送信が無ければ、消して再読み込み） */
+/** 印があれば、消去を試す（未送信が無ければ、消して再読み込み）。このセッションで失敗していれば、試さない */
 export async function tryClearCache(): Promise<void> {
   const mark = clearMark.peek();
-  if (!mark || running) return;
+  if (!mark || running || readSession(FAILED_KEY)) return;
   running = true;
   try {
     const decision = decideCacheClear(mark, Date.now(), await hasPendingWrites());
@@ -65,42 +76,37 @@ export async function confirmCacheClear(): Promise<void> {
   await clearAndReload();
 }
 
-async function clearAndReload(): Promise<void> {
+/** ほかのタブに知らせてから消す。成功したら true。失敗したら、このセッションでは自動で試さない印を残す */
+async function clearEverywhere(): Promise<boolean> {
+  channel?.postMessage('clearing');
   try {
     await clearLocalCache();
-    setMark(null);
     writeStorage(KNOWN_KEY, null); // 次のサーバーの一覧から、数え直す
-  } catch (e) {
-    // 別のタブが開いているなど。印を残し、次の起動時にもう一度試す
-    console.warn('端末のキャッシュを消せませんでした', e);
-  }
-  location.reload();
-}
-
-/** ログアウト：未送信の確認は、呼ぶ側（画面）で済ませておく。キャッシュを消して、再読み込みする */
-export async function clearCacheForLogout(): Promise<void> {
-  try {
-    await clearLocalCache();
-    writeStorage(KNOWN_KEY, null);
     setMark(null);
+    return true;
   } catch (e) {
-    console.warn('端末のキャッシュを消せませんでした。次の起動時に消します', e);
-    writeStorage(CLEAR_ON_START_KEY, '1');
+    console.warn('端末のキャッシュを消せませんでした', e);
+    writeSession(FAILED_KEY, '1');
+    return false;
   }
+}
+
+async function clearAndReload(): Promise<void> {
+  await clearEverywhere(); // 失敗しても、db は終了している（ことがある）ため、再読み込みは要る。印は残り、次のセッションで試す
   location.reload();
 }
 
-/** 起動時（画面を出す前）：ログアウトで消せなかった分と、持ち越した消去を試す */
+/** ログアウト：未送信の確認は、呼ぶ側で済ませておく。キャッシュを消して、再読み込みする */
+export async function clearCacheForLogout(): Promise<void> {
+  if (!(await clearEverywhere())) writeStorage(CLEAR_ON_START_KEY, '1'); // 次のセッションの起動時に消す
+  location.reload();
+}
+
+/** 起動時（画面を出す前）：ログアウトで消せなかった分と、持ち越した消去を試す。このセッションで失敗していれば、試さない */
 export async function clearCacheOnStart(): Promise<void> {
+  if (readSession(FAILED_KEY)) return;
   if (readStorage(CLEAR_ON_START_KEY)) {
-    writeStorage(CLEAR_ON_START_KEY, null);
-    try {
-      await clearLocalCache();
-      writeStorage(KNOWN_KEY, null);
-      setMark(null);
-    } catch (e) {
-      console.warn('端末のキャッシュを消せませんでした', e);
-    }
+    if (await clearEverywhere()) writeStorage(CLEAR_ON_START_KEY, null);
     location.reload();
     return new Promise(() => {}); // 再読み込みまで、画面を出さない
   }

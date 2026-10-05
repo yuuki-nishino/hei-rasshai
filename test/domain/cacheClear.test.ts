@@ -1,6 +1,6 @@
 // testing.md §4 #28（24時間後の確認）の判断の部分
 import { describe, expect, it } from 'vitest';
-import { decideCacheClear, lostMemberships, mergeClearMark } from '../../src/lib/domain';
+import { decideCacheClear, lostMemberships, mergeClearMark, pruneClearMark } from '../../src/lib/domain';
 
 const H = 3600 * 1000;
 const mark = { since: 1_000_000, events: ['e1'] };
@@ -27,5 +27,15 @@ describe('lostMemberships / mergeClearMark', () => {
   it('印は、最初の時刻を残し、イベントを重ねずに足す', () => {
     expect(mergeClearMark(null, ['e1'], 5)).toEqual({ since: 5, events: ['e1'] });
     expect(mergeClearMark({ since: 1, events: ['e1'] }, ['e1', 'e2'], 5)).toEqual({ since: 1, events: ['e1', 'e2'] });
+  });
+});
+
+describe('pruneClearMark（PR #34 のレビュー K3）', () => {
+  it('もう一度メンバーになったイベントを、印から外す。時刻は残す', () => {
+    expect(pruneClearMark({ since: 1, events: ['e1', 'e2'] }, ['e1', 'e3'])).toEqual({ since: 1, events: ['e2'] });
+  });
+  it('空になったら null。印が無ければ null', () => {
+    expect(pruneClearMark({ since: 1, events: ['e1'] }, ['e1'])).toBeNull();
+    expect(pruneClearMark(null, ['e1'])).toBeNull();
   });
 });

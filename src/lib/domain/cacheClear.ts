@@ -32,3 +32,13 @@ export function lostMemberships(known: readonly string[], memberOf: readonly str
 export function mergeClearMark(mark: ClearPendingMark | null, events: readonly string[], now: number): ClearPendingMark {
   return { since: mark?.since ?? now, events: [...new Set([...(mark?.events ?? []), ...events])] };
 }
+
+/**
+ * サーバーで、もう一度メンバーだと確かめられたイベントを、印から外す（参加し直した場合。PR #34 のレビュー K3）。
+ * 空になったら null（消去は要らない）
+ */
+export function pruneClearMark(mark: ClearPendingMark | null, memberOf: readonly string[]): ClearPendingMark | null {
+  if (!mark) return null;
+  const events = mark.events.filter((id) => !memberOf.includes(id));
+  return events.length === 0 ? null : { ...mark, events };
+}

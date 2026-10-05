@@ -46,6 +46,7 @@ App
 | `hei:knownEvents` | これまでにサーバーで確かめた、自分のイベントのID（外れたことの検知。data-access.md §8） |
 | `hei:clearPending` | 端末のキャッシュの消去待ちの印（`{ since, events }`。data-access.md §8） |
 | `hei:clearOnStart` | ログアウトで消せなかったキャッシュを、次の起動時に消す印 |
+| `hei:clearFailed`（`sessionStorage`） | このセッションで、キャッシュの消去に失敗した（自動では、もう試さない） |
 - `localStorage` が使えない環境でも、動くようにする（読み書きは try/catch）
 
 ### 1.4 表示名の引き方
