@@ -168,4 +168,6 @@
 - [ ] ログアウトで、端末のキャッシュが消える。メンバーから外された端末が、データを読めなくなる
 
 ## 6. CI
-- 当面は、ローカルの `npm test`（Vitest ＋ Emulator）のみ。GitHub Actions は、必要になってから検討する
+- GitHub Actions（`.github/workflows/ci.yml`）で、PRとmainへのpushのたびに、型・Lint・単体テスト・**ルールのテスト（Firestore Emulator）**・ビルドを実行する（#3。ルールの変更が、レビューで見落とされないように）
+- `npm test` は、単体テスト（`npm run test:unit`）と、ルールのテスト（`npm run test:rules`。`firebase emulators:exec` で、Emulatorを起動して実行する）を、続けて実行する。ルールのテストには、Java 21 以上が必要
+- データアクセスの結合テスト（§4）も、作ったら、同じようにCIで実行する

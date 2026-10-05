@@ -57,6 +57,8 @@ service cloud.firestore {
     function isMember(e) { return signedIn() && exists(subPath(e, 'members', request.auth.uid)); }
     function isOwner(e)  { return signedIn() && get(eventPath(e)).data.ownerUid == request.auth.uid; }
     function isDeleting(e) { return get(eventPath(e)).data.deleting == true; }
+    // イベントがあり、削除中でない（参加・招待は、削除中・削除後のイベントでは受け付けない）
+    function isActiveEvent(e) { return exists(eventPath(e)) && get(eventPath(e)).data.deleting == false; }
 
     function canCreateEvent() {
       return signedIn() && request.auth.token.email_verified
@@ -106,7 +108,9 @@ service cloud.firestore {
         && validEvent(request.resource.data)
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.deleting == false
-        && request.resource.data.createdAt == request.time;
+        && request.resource.data.createdAt == request.time
+        // 同じバッチで、自分の members（role = owner）を作る。作らないと、オーナーにも見えないイベントになる
+        && getAfter(subPath(eventId, 'members', request.auth.uid)).data.role == 'owner';
       allow update: if isMember(eventId)
         && validEvent(request.resource.data)
         && request.resource.data.ownerUid == resource.data.ownerUid
@@ -125,11 +129,13 @@ service cloud.firestore {
           && request.resource.data.displayName is string
           && request.resource.data.displayName.size() <= 60
           && (
-            // オーナー：イベントと同じバッチで作る
+            // オーナー：イベントの ownerUid が自分なら作れる（作成は、イベントと同じバッチで行う。
+            // バッチの外でも作れるが、オーナーはイベントがある間は抜けられないため、害はない）
             (request.resource.data.role == 'owner'
               && getAfter(eventPath(eventId)).data.ownerUid == uid)
             // メンバー：自分のメールアドレス宛ての有効な招待があり、同じバッチで招待が削除される
             || (request.resource.data.role == 'member'
+              && isActiveEvent(eventId)
               && request.auth.token.email_verified
               && exists(subPath(eventId, 'invites', myEmail()))
               && request.time < get(subPath(eventId, 'invites', myEmail())).data.createdAt + duration.value(1, 'd')
@@ -148,7 +154,7 @@ service cloud.firestore {
       // ---------- 招待（有効期限は createdAt から1日。ルールが計算する） ----------
       match /invites/{email} {
         allow read: if isOwner(eventId);
-        allow create, update: if isOwner(eventId)
+        allow create, update: if isOwner(eventId) && isActiveEvent(eventId)
           && email == email.lower() && email.matches('^[^@]+@[^@]+$')
           && request.resource.data.keys().hasOnly(['createdBy', 'createdAt'])
           && request.resource.data.createdBy == request.auth.uid
@@ -288,7 +294,7 @@ service cloud.firestore {
 ### イベント作成（1バッチ）
 1. `events/{eventId}` を作成（`ownerUid = 自分のuid`、`deleting = false`、`createdAt = serverTimestamp`）
 2. `events/{eventId}/members/{uid}` を作成（`role = 'owner'`）
-- ルールは、`canCreateEvent()` と、`getAfter` による `ownerUid` の一致を検証する
+- ルールは、`canCreateEvent()` と、`getAfter` による**両方向**の対応を検証する：オーナーの `members` は、イベントの `ownerUid` が自分のときだけ作れる。イベントは、同じバッチで、自分の `members`（`role = 'owner'`）を作るときだけ作れる（[PR #26 レビュー](../reviews/pr-26-rules-review.md) P2）
 
 ### 招待（オーナー）
 1. 相手のGoogleメールアドレス（小文字）を入力
@@ -296,12 +302,13 @@ service cloud.firestore {
 3. 画面にリンク `{origin}/join?e={eventId}` を表示。コピーして、相手に送る
 - 再発行：同じ `invites/{email}` の `createdAt` を、`serverTimestamp` で更新する（期限が、その時点から1日になる）
 - 取り消し：`invites/{email}` を削除する
+- 削除中（`deleting = true`）のイベントでは、招待の作成・再発行はできない（削除はできる。イベントの削除の手順で、招待を消すため）
 
 ### 参加（招待された人）
 1. リンクを開く → 未ログインなら、Googleでログイン（`prompt: 'select_account'`）
 2. すでにメンバーか確認する（`members/{自分のuid}` を `get`）。メンバーなら、そのイベントを選択して終了
 3. 1バッチで、`members/{自分のuid}` を作成（`role = 'member'`）し、`invites/{自分のメール}` を削除する
-4. ルールが、自分のメールアドレス宛ての有効な招待があることと、**同じバッチで招待が削除されること**（`!existsAfter`）を検証する
+4. ルールが、自分のメールアドレス宛ての有効な招待があることと、**同じバッチで招待が削除されること**（`!existsAfter`）を検証する。**イベントが削除中・削除後なら、招待があっても参加できない**（[PR #26 レビュー](../reviews/pr-26-rules-review.md) P1。削除の途中で、メンバーが増えないようにする）
 5. 失敗（`permission-denied`）したときは、「このアカウント（{メール}）では、このイベントに参加できません。招待されたアカウントでログインし直してください。招待の期限（発行から1日）が切れている場合は、オーナーに再発行を頼んでください」と表示する
 
 ### メンバーの削除・抜ける
@@ -328,6 +335,39 @@ service cloud.firestore {
 | R9 | 番号のルール：`exists(...) ? get(...).data.n : 0` の三項演算子、トランザクション内の `getAfter`（カウンターを進めない注文の作成が拒否されること、同じ番号の2件目が拒否されること） |
 | R10 | 文字列の比較（`startDate <= endDate`）、`timestamp + duration` の比較が、意図どおりに動くこと |
 | R11 | `request.time` と `serverTimestamp()` の一致（バッチ・トランザクション内、およびオフラインで溜めた更新が、後から届いたとき） |
+
+### 検証の結果（Emulator）
+
+| # | 結果 | 確かめたテスト（`test/rules/`） |
+|---|---|---|
+| R1 | ✅ #3。メンバー作成のルールは、同じバッチで削除する前の招待を `exists` / `get` で読め、`existsAfter` は `false` になる。招待を削除しないバッチは拒否される | members：34・35 |
+| R2 | ✅ #3。`getAfter(eventPath)` は、同じバッチで作るイベントを参照できる。イベントが無い状態で、オーナーの `members` だけを作ることはできない | events：29 |
+| R3 | ✅ #3。自分の uid の条件なら `list` でき、他人の uid・条件なしは拒否。**このルールは、コレクショングループのクエリだけでなく、個別のイベントの `members` の `list` にも効く**（非メンバーでも、`where('uid', '==', 自分)` なら許可される）。下の「R3 の安全性の確認」のとおり、情報は漏れないため、許容する | members：47、R3 の抜け道 |
+| R4 | ✅ #3。`events/{e}/foo/x`、`members` のさらに下、トップレベルの未知のコレクションは、メンバー・オーナーでも拒否 | misc：51 |
+| R5 | ✅ #3。`.`・`+`・サブドメインを含むメールアドレスを、IDに使える。大文字を含むID、`@` が0個・2個のIDは拒否。トークンのメールの大文字は、`lower()` で照合できる | invites、members、events |
+| R10 | ✅ #3（イベント・招待の部分）。`startDate > endDate` は拒否。`createdAt + duration.value(1, 'd')`：23時間前の招待は有効、25時間前は無効 | events：31、members：34・36 |
+| R11 | ✅ #3（バッチの部分）。バッチ内の `serverTimestamp()` は `request.time` と一致する。クライアントの時刻は拒否。**トランザクションと、オフラインで溜めた更新は、#4・M7 で確かめる** | events・members・invites |
+
+**R3 の安全性の確認**（#3）
+
+Firestore のルールは「フィルターではない」。検索の条件だけで、読めない文書が結果に混ざらないと証明できない検索は、**結果を絞るのではなく、検索ごと拒否する**（PostgreSQL の RLS は、条件に合わない行を、黙って結果から除く。ここが違う）。そのため、「uid が自分」と証明できる検索だけが通る。攻撃する側の目線で、次を確かめた。
+
+| 試したこと | 結果 |
+|---|---|
+| `in` に他人の uid を混ぜる、`!=`・範囲（`>=`）で探す | 拒否 |
+| `role`・`email` など、uid 以外の項目で探す、条件なし | 拒否 |
+| 自分の uid に、別の条件を足す | 許可。結果は自分の文書だけ（非メンバーなら空） |
+| 存在するイベント／存在しないイベントの `members` を、自分の uid で探す | どちらも空。**イベントの有無は分からない** |
+| 他人の `members` を1件 `get` | 拒否（このルールは `list` だけ） |
+| メンバーから外された人が、自分の uid で探す | 外されたイベントは返らない（文書が消えているため） |
+| どこかの `members`（トップレベル、`foo/x/members`、`members` の下の `members`）に書き込む | 拒否（このルールは `list` だけで、書き込みを許可しない） |
+
+- 結論：非メンバーが知り得るのは、**「自分は、そのイベントのメンバーではない」という、自分自身のことだけ**。他人の情報・イベントの有無は、分からない
+- 前提：`members` の `uid` の項目は、ドキュメントIDと一致する（作成のルールが `uid == ドキュメントID` を強制する）。**Firebaseコンソールで、手で `members` を作るときは、この一致を守る**（守らないと、ある uid の文書として、別の人の文書が見えることがあり得る）
+- 無料枠：空の結果でも、検索1回につき、読み取り1回として数えられる。ログインが必要なため、誰でもできる注文の `get`（§6）より、悪用の余地は小さい。同じく、当面は許容する
+
+- テストが、ルールの要の行を本当に検査していることを、ルールをわざと壊して確かめた（#3）：`!existsAfter`・招待の期限・オーナーの自己削除の制限・コレクショングループの uid 条件・`creators` の照合・`deleting` の制限を、それぞれ消すと、テストが失敗する。未知のサブコレクションを許可すると、テストが失敗する。PR #26 のレビューで足した行（参加・招待の `isActiveEvent`、イベントの作成の `getAfter(members).role`）も、同じく、消すとテストが失敗する
+- R6〜R9 は #4 で確かめる
 
 ## 6. 想定するリスクと、公開時の追加対策
 
