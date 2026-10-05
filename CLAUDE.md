@@ -48,13 +48,13 @@ Issue（1PR分）→ ブランチ → 実装・テスト → PR（Closes #番号
 | `npm run dev:emu` | 開発サーバー（Emulatorに接続。`.env.emulator`。先に `npm run emulators`） |
 | `npm run emulators` | Auth・Firestore・HostingのEmulator（`demo-maido-ookini`。UIは http://127.0.0.1:4000 、Hostingは `dist/` を :5002 で配信） |
 | `npm run build` | 型チェック ＋ ビルド（本番の設定値。スタッフ用・お客様用を別々に、`dist/` へ） |
-| `npm run build:dev` | 同上（devの設定値。`.env.development`）。devへのデプロイの前に使う |
+| `npm run build:dev` | 同上（devの設定値。`.env.development`）。devへのデプロイでは自動で行われるため、手元で確かめるときに使う |
 | `npm run typecheck` | 型チェック（`tsc -b`） |
 | `npm run lint` | Lint（ESLint。レイヤーの依存の向きも検査する） |
 | `npm test` | 単体テスト ＋ ルールのテスト |
 | `npm run test:unit` | 単体テスト（Vitest。`test/domain`） |
 | `npm run test:rules` | ルールのテスト（`test/rules`。Firestore Emulatorを起動して実行。Java 21 以上が必要） |
-| `npx firebase deploy -P dev` | devへのデプロイ（Firebase CLIは devDependencies に入っている） |
+| `npx firebase deploy -P dev` | devへのデプロイ（Firebase CLIは devDependencies に入っている）。Hostingのビルドは、デプロイの直前に、devの設定値で自動で行われる（DESIGN.md §5「デプロイ」） |
 
 - Node.js は 24（`.nvmrc`）
 - CI（`.github/workflows/ci.yml`）は、PRとmainへのpushで、型・Lint・単体テスト・ルールのテスト・ビルドを実行する

@@ -92,6 +92,7 @@ maido-ookini/
 - `firebase.json`：
   - rewrite：`/s` → `/customer.html`、その他 → `/index.html`
   - ヘッダー：`Referrer-Policy: same-origin`、`X-Content-Type-Options: nosniff`。Service Workerのファイルは、キャッシュしない（`Cache-Control: no-cache`）
+  - **キャッシュ**（#6）：HTML（`/`・`/s` など、`/assets` 以外のすべて）は `Cache-Control: no-cache`（使う前に、毎回、新しいかをサーバーに確かめる。変わっていなければ、本文は送られない）。ファイル名にハッシュが付く `/assets/**` は `public, max-age=31536000, immutable`（中身が変わればファイル名も変わるため、1年キャッシュしてよい）。Firebase Hosting の既定（`max-age=3600`）のままだと、デプロイし直しても、端末によっては最大1時間、古い画面が出るため。`firebase.json` では、後に書いたルールが、同じヘッダーを上書きする（Emulator・dev で確認）
   - **クリックジャッキング対策**：`Content-Security-Policy: frame-ancestors 'self'`（と、古いブラウザ向けに `X-Frame-Options: SAMEORIGIN`）。他のサイトから、画面を `iframe` で埋め込まれ、取り消しなどを押させられるのを防ぐ。`'none'` ではなく `'self'` にするのは、`authDomain` をHostingと同じドメインにしたとき、Firebase Authの `iframe`（同じドメインの `/__/auth/iframe`）を、阻害しないため
   - CSP全体（`script-src` など）は、Firebase AuthとGoogleのスクリプト・Viteのインライン処理との兼ね合いが大きく、今回は見送る
 - ★W1 Service Workerのスコープと、`/s` の関係（お客様画面に影響しないこと。ナビゲーションのフォールバックから `/s` を除外する）
@@ -102,7 +103,7 @@ maido-ookini/
 | 環境 | 用途 | Firebase |
 |---|---|---|
 | ローカル | 開発。Emulator（Auth・Firestore）で、本番データに触れない | Emulator |
-| 開発用プロジェクト（`maido-ookini-dev`） | **実機での確認**（Googleログインは、実際のFirebaseが必要。Hostingのプレビューチャンネルで配信） | Spark |
+| 開発用プロジェクト（`maido-ookini-dev`） | **PRの確認・実機での確認**（Googleログインは、実際のFirebaseが必要）。PRのブランチを、devの本体（`https://maido-ookini-dev.web.app`）にデプロイする。プレビューチャンネルは、URLごとに、Authの承認済みドメインの追加が要るため、使わない | Spark |
 | 本番 | イベントで使う | Spark（`maido-ookini`） |
 
 - 設定値は `.env.*` の `VITE_FIREBASE_*`（項目は `.env.example`）。`VITE_USE_EMULATOR=true` のときだけ、Emulatorに接続する。Firebaseの設定値は、秘密ではないが、リポジトリには入れない（`.env.development`・`.env.production` はgit管理外）
@@ -116,8 +117,27 @@ maido-ookini/
 3. Authenticationで、Googleログインを有効化。承認済みドメインに、Hostingのドメインを追加
 4. ウェブアプリを登録し、設定値を `.env` に入れる
 5. `creators/{許可するメールアドレス}` を、コンソールで作成する（最初は運営者自身）。**IDは小文字で登録する**（ルールは、ログイン中のメールを `lower()` にして比較するため、大文字を含むIDには一致しない）
-6. `firebase deploy --only firestore:rules,firestore:indexes,hosting`
+6. `npx firebase deploy -P <dev か prod>`（ルール・インデックス・Hosting。下の「デプロイ」）
 7. 当日までに、スタッフの端末でログインする（C2）
+
+### デプロイ（#6）
+devは、PRのたびに、手元から行う（のちに GitHub Actions にする）。本番は、イベントの前に、**main から**、手動で行う（ユーザーの明示的な指示があるときだけ）。
+
+```sh
+git switch feature/#12-…          # 確認したい PR のブランチ
+npm ci                             # 依存を、lock どおりにする
+npx firebase deploy -P dev         # ルール・インデックス・Hosting をまとめて
+npx firebase deploy -P dev --only firestore:rules   # ルールだけ（ルールを変えた PR で、画面がまだ無いとき）
+```
+
+- **ビルドは、デプロイの直前に、自動で行われる**（`firebase.json` の `hosting.predeploy`）。`npm run typecheck` の後、`node scripts/build.mjs --project $GCLOUD_PROJECT` が、デプロイ先に対応する `.env`（dev → `.env.development`、本番 → `.env.production`）でビルドする。手で `npm run build:dev` を忘れたり、別の設定値の `dist/` を、そのままデプロイしたりすることがない
+- `.env` の取り違えを防ぐため、`.env.{mode}` の `VITE_FIREBASE_PROJECT_ID` が、デプロイ先と違えば、ビルドを止める。対応表に無いプロジェクトへのデプロイも止める（`scripts/build.mjs`）
+- dev は、1つの環境を、すべての PR で共有する。**最後にデプロイした PR の状態**になる。ルールも、プロジェクト全体に効く。そのため、別の PR を確かめるときは、そのブランチで、デプロイし直す
+- デプロイの後に確かめること：
+  - `https://maido-ookini-dev.web.app/`（スタッフ用）と `/s`（お客様用）が開く
+  - 応答のヘッダー（`Referrer-Policy`・`X-Content-Type-Options`・`Content-Security-Policy: frame-ancestors 'self'`・`X-Frame-Options`・`Cache-Control`）。`curl -sI https://maido-ookini-dev.web.app/s`
+  - ルールを変えた PR では、反映されたルールが、手元の `firestore.rules` と一致すること
+- Authの承認済みドメイン：`maido-ookini-dev.web.app`・`maido-ookini-dev.firebaseapp.com`・`localhost` は、プロジェクトの作成時に、自動で入っている（#6 で確認）。独自ドメインを使うときだけ、追加する
 
 ## 6. 認証
 
@@ -184,7 +204,7 @@ Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／
 | U1 | Googleログイン（popup / redirect、`authDomain`）。Safariのタブはマイルストーン1、ホーム画面アプリは、追加を勧める前に確認 | マイルストーン1・7、実機 |
 | U4 | イベント削除（Cloud Functionsなしで、配下を消す）の件数・時間・中断時の動作 | マイルストーン8 |
 | R1〜R11 | ルールの検証項目（[security-rules.md](./design/security-rules.md) §5）。**R8（墓標の排他）が、確定フローの安全性の要** | マイルストーン1・Emulator |
-| W1 | Service Workerと `/s` の関係（お客様画面に影響しないこと） | マイルストーン5・7 |
+| W1 | Service Workerと `/s` の関係（お客様画面に影響しないこと） | マイルストーン5・7。**`/s` の配信は #6 で確認済み**（dev で、`/s`・`/s?e=…&o=…` がお客様用の `customer.html` を、`/join` などそれ以外がスタッフ用の `index.html` を返す。ヘッダーも付く）。Service Worker との関係は M7 |
 | W2 | `frame-ancestors 'self'` が、Googleログインに影響しないこと | マイルストーン1・実機 |
 | F1 | お客様画面の初回JavaScriptが、gzip後200KB以下か（Firestore SDKの大きさ）。#2の時点で、Preact＋Firestore（メモリキャッシュ・`getDoc` 1回）で、約137KB | マイルストーン5 |
 | N1 | 接続状態の推定（`fromCache` が10秒続いたらオフライン）が、実機で、遅すぎ・早すぎないか | マイルストーン7 |
