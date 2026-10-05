@@ -14,6 +14,7 @@ Firestore のアクセス制御。データの定義は [data-model.md](./data-m
 - 番号の一意性は、カウンターが「ちょうど1ずつ進む」ことと、注文が「そのカウンターの値で作られる」ことで、ルールが担保する
 - 「やめる」と遅れた注文の登録の競合は、**墓標（`voids`）**で、時間に頼らずに排他する（[ADR-0004](../adr/0004-void-tombstone.md)）
 - 注文は、**イベントの削除中以外は、削除できない**（`events.deleting` フラグ）
+- **削除中・削除後のイベントには、新しい文書（注文・墓標・カウンター・メニュー・レジ締め）を作れない**。既にある文書の更新は、削除中も許す（オフラインで溜めた操作が、後から届いても、拒否の通知を出さないため。消すのは、削除の手順）
 - ルールは、**一致したものの OR** で判定される（優先順位はない）。そのため、サブコレクションごとに、明示的に `match` を書き、書いていないものは、すべて拒否する
 - ルールの `exists` / `get` は、1回ごとに、読み取り1回として数えられる
 
@@ -57,7 +58,8 @@ service cloud.firestore {
     function isMember(e) { return signedIn() && exists(subPath(e, 'members', request.auth.uid)); }
     function isOwner(e)  { return signedIn() && get(eventPath(e)).data.ownerUid == request.auth.uid; }
     function isDeleting(e) { return get(eventPath(e)).data.deleting == true; }
-    // イベントがあり、削除中でない（参加・招待は、削除中・削除後のイベントでは受け付けない）
+    // イベントがあり、削除中でない。削除中・削除後のイベントでは、参加・招待と、新しい文書の作成を受け付けない
+    // （オーナーの members は削除の最後まで残るため、isMember だけでは、イベントが消えた後にも作れてしまう）
     function isActiveEvent(e) { return exists(eventPath(e)) && get(eventPath(e)).data.deleting == false; }
 
     function canCreateEvent() {
@@ -167,8 +169,9 @@ service cloud.firestore {
       // ---------- 墓標（「やめる」で、その注文IDを以後使えなくする） ----------
       match /voids/{orderId} {
         allow get: if isMember(eventId);
-        allow create: if isMember(eventId)
-          && !exists(subPath(eventId, 'orders', orderId))
+        allow create: if isMember(eventId) && isActiveEvent(eventId)
+          // 書き込みの後に、注文が無い（同じバッチで、注文と墓標を両方作ることも拒否する）
+          && !existsAfter(subPath(eventId, 'orders', orderId))
           && request.resource.data.keys().hasOnly(['createdBy', 'createdAt'])
           && request.resource.data.createdBy == request.auth.uid
           && request.resource.data.createdAt == request.time;
@@ -182,8 +185,9 @@ service cloud.firestore {
         allow get: if true;
         allow list: if isMember(eventId);
 
-        allow create: if isMember(eventId)
-          && !exists(subPath(eventId, 'voids', orderId))
+        allow create: if isMember(eventId) && isActiveEvent(eventId)
+          // 書き込みの後に、墓標が無い（墓標は、イベントの削除中以外は消せないため、「前に無い」も意味する）
+          && !existsAfter(subPath(eventId, 'voids', orderId))
           && request.resource.data.keys().hasOnly(
                ['number', 'day', 'items', 'total', 'payment', 'status', 'cancelledFrom', 'qr',
                 'createdAt', 'readyAt', 'doneAt', 'cancelledAt', 'createdBy', 'updatedBy', 'updatedAt'])
@@ -248,14 +252,15 @@ service cloud.firestore {
       // ---------- メニュー ----------
       match /menu/{menuId} {
         allow read: if isMember(eventId);
-        allow create, update: if isMember(eventId) && validMenu(request.resource.data);
+        allow create: if isMember(eventId) && isActiveEvent(eventId) && validMenu(request.resource.data);
+        allow update: if isMember(eventId) && validMenu(request.resource.data);
         allow delete: if isMember(eventId);
       }
 
       // ---------- 採番カウンター ----------
       match /counters/{day} {
         allow read: if isMember(eventId);
-        allow create: if isMember(eventId) && validDay(day)
+        allow create: if isMember(eventId) && isActiveEvent(eventId) && validDay(day)
           && request.resource.data.keys().hasOnly(['n']) && request.resource.data.n == 1;
         allow update: if isMember(eventId)
           && request.resource.data.keys().hasOnly(['n'])
@@ -266,7 +271,8 @@ service cloud.firestore {
       // ---------- レジ締め ----------
       match /closings/{day} {
         allow read: if isMember(eventId);
-        allow create, update: if isMember(eventId) && validClosing(request.resource.data, day);
+        allow create: if isMember(eventId) && isActiveEvent(eventId) && validClosing(request.resource.data, day);
+        allow update: if isMember(eventId) && validClosing(request.resource.data, day);
         allow delete: if isOwner(eventId) && isDeleting(eventId);
       }
 
@@ -286,6 +292,7 @@ service cloud.firestore {
 ### ルールで担保できないこと
 - `items` の**各行の中身**（`menuId`・`price`・`qty` の型・範囲）と、`total` との一致：ルールには、リストを繰り返し検査する構文がない。`total` が1以上の整数であることと、行数だけを検査する
 - 注文を作らずに、カウンターだけを進めること（番号が欠ける。重複はしない）
+- **同じバッチ（トランザクション）の中で、複数の注文を、同じ番号で作ること**：カウンターは、1回の書き込みで1つしか進められないが、ルールは、注文ごとに「前の値＋1 ＝ 後の値 ＝ 番号」を確かめるだけのため、同じ書き込みの中の、ほかの注文までは見えない。アプリの確定（1回に1件）では起こらない。メンバーが、わざと行った場合に限られる（メンバーは信頼する前提。#4 で確認）
 - メニューが100件を超えること：クライアントで制限する
 - 1日（`day`）を、端末の日付と一致させること：メンバーを信頼する
 
@@ -316,7 +323,7 @@ service cloud.firestore {
 - 削除された人の、画面の購読は `permission-denied` になる。→ イベント一覧に戻す。端末のキャッシュも消す（[data-access.md](./data-access.md) §8）
 
 ### イベントの削除
-1. オーナーが、`events/{eventId}.deleting = true` にする
+1. オーナーが、`events/{eventId}.deleting = true` にする。これ以降、オーナーを含めて、新しい注文などは作れない（ルールの `isActiveEvent`）
 2. 配下を削除する（順序は [data-access.md](./data-access.md) §7）。注文・カウンター・レジ締め・墓標の削除は、`deleting = true` のときだけ許可される
 3. イベントを削除し、最後に、自分の `members` を削除する（イベントが無くなった後は、ルールが許可する）
 
@@ -345,8 +352,12 @@ service cloud.firestore {
 | R3 | ✅ #3。自分の uid の条件なら `list` でき、他人の uid・条件なしは拒否。**このルールは、コレクショングループのクエリだけでなく、個別のイベントの `members` の `list` にも効く**（非メンバーでも、`where('uid', '==', 自分)` なら許可される）。下の「R3 の安全性の確認」のとおり、情報は漏れないため、許容する | members：47、R3 の抜け道 |
 | R4 | ✅ #3。`events/{e}/foo/x`、`members` のさらに下、トップレベルの未知のコレクションは、メンバー・オーナーでも拒否 | misc：51 |
 | R5 | ✅ #3。`.`・`+`・サブドメインを含むメールアドレスを、IDに使える。大文字を含むID、`@` が0個・2個のIDは拒否。トークンのメールの大文字は、`lower()` で照合できる | invites、members、events |
+| R6 | ✅ #4。`cancelledFrom` が `null` の注文で、`status == resource.data.cancelledFrom` は `false` になり、取り消し前と違う状態へ戻す更新は拒否される。取り消し以外の状態で `cancelledFrom` に値を入れる、取り消し中のまま書き換える、も拒否 | orders：19〜21 |
+| R7 | ✅ #4。`diff().affectedKeys()` は、値が変わらない項目（`total` を同じ値で書く、`readyAt` が `null` のまま）を含まない。値を変えると拒否 | orders：16 |
+| R8 | ✅ #4。「墓標 → 注文」「注文 → 墓標」の両方の順序で、後の書き込みが拒否される。**同じバッチで、注文と墓標を両方作る**ことも拒否する（`!exists` を `!existsAfter` にした。下記）。確定とやめるのトランザクションを並行して5回実行し、注文と墓標が並存しないことも確かめた（補助） | voids：24〜26 |
+| R9 | ✅ #4。三項演算子（カウンターが無ければ 0）で、その日の最初の注文が1番になる。トランザクション・バッチの中の `getAfter` で、カウンターを進めない・2つ進める・番号と合わない・同じ番号の2件目、は拒否される | orders：7・13〜15、カウンター：48 |
 | R10 | ✅ #3（イベント・招待の部分）。`startDate > endDate` は拒否。`createdAt + duration.value(1, 'd')`：23時間前の招待は有効、25時間前は無効 | events：31、members：34・36 |
-| R11 | ✅ #3（バッチの部分）。バッチ内の `serverTimestamp()` は `request.time` と一致する。クライアントの時刻は拒否。**トランザクションと、オフラインで溜めた更新は、#4・M7 で確かめる** | events・members・invites |
+| R11 | ✅ #3（バッチ）・#4（トランザクション）。バッチ・トランザクション内の `serverTimestamp()` は `request.time` と一致する。クライアントの時刻は拒否。**オフラインで溜めた更新は、M7（データアクセスの結合テスト §4 の13）で確かめる** | events・members・invites・orders・voids |
 
 **R3 の安全性の確認**（#3）
 
@@ -367,7 +378,20 @@ Firestore のルールは「フィルターではない」。検索の条件だ�
 - 無料枠：空の結果でも、検索1回につき、読み取り1回として数えられる。ログインが必要なため、誰でもできる注文の `get`（§6）より、悪用の余地は小さい。同じく、当面は許容する
 
 - テストが、ルールの要の行を本当に検査していることを、ルールをわざと壊して確かめた（#3）：`!existsAfter`・招待の期限・オーナーの自己削除の制限・コレクショングループの uid 条件・`creators` の照合・`deleting` の制限を、それぞれ消すと、テストが失敗する。未知のサブコレクションを許可すると、テストが失敗する。PR #26 のレビューで足した行（参加・招待の `isActiveEvent`、イベントの作成の `getAfter(members).role`）も、同じく、消すとテストが失敗する
-- R6〜R9 は #4 で確かめる
+- #4 で足したルール（注文・墓標・メニュー・カウンター・レジ締め）も、要の行を1つずつ無効にして確かめた。墓標の排他（両方向）、注文の作成の `createdBy`・`updatedBy`・時刻・支払い・`total`・行数・初期値（`cancelledFrom`・`readyAt`・`cancelledAt`）、更新の遷移・`cancelledFrom`・`updatedBy`・`updatedAt`・支払い、カウンターの +1、メニューの価格・名前、レジ締めの `diff`・`closedAt`/`closedBy`・メモの長さは、消すとテストが失敗する
+  - 消してもテストが通った3行は、**ほかの条件が同じことを保証する、重ねがけ**のため、残す：`number is int && number >= 1`（カウンターは1以上なので、「前の値＋1 ＝ 番号」から導かれる）、`validDay(day)`（その日のカウンターは、IDが日付の形式でないと作れない）、`qr is bool`（状態の条件が、`qr == true` か `qr == false` を求める）
+
+**削除中・削除後のイベントへの作成を拒否する理由**（#4 のレビュー）
+- 削除の手順（[data-access.md](./data-access.md) §7）で書き込めなくなるのは、手順 2 で `members` を消される、オーナー以外のメンバーだけ。**オーナー自身の `members` は、手順 6 まで残る**ため、`isMember` だけでは、オーナー（の別の端末など）が、削除中や、イベントが消えた後（手順 5〜6 の間、または 6 で止まったとき）にも、注文を作れてしまう
+- イベントが消えた後の注文は、削除のルール（`isOwner` がイベントを読む）が通らないため、**誰も消せない**。しかも、注文は誰でも `get` できるため、ID を知る人には読めるまま残る。手順 0 で防ごうとしている状態そのもの
+- そのため、注文・墓標・カウンター・メニュー・レジ締めの**作成**に、`isActiveEvent`（イベントがあり、`deleting == false`）を足した。更新は、既にある文書にしか効かず、削除の手順で消えるため、条件にしない
+- 無料枠：作成のたびに、イベントの文書を1回読む（ルールの `get`）。主に、注文1件につき、読み取りが1回増える（カウンターは日に1回の作成、メニュー・レジ締めは少ない）。1日 数百件の注文なら、数百回で、読み取りの無料枠（5万／日）の 1% 程度
+- 確かめたこと：通常は作れる／`deleting = true` ではオーナー・メンバーとも作れない／イベントを消し、オーナーの `members` だけが残る状態でも作れない／削除中でも、既にある注文・メニュー・レジ締めは更新できる。足した5か所を、1つずつ外すと、テストが失敗する（`test/rules/deleting.test.ts`）
+
+**墓標の排他を `!existsAfter` にした理由**（#4）
+- 設計の初期案は、`!exists`（書き込みの**前**の状態）だった。これだと、**同じバッチで、同じ `orderId` の注文と墓標を両方作る**と、どちらのルールも「相手は、まだ無い」と判断し、両方が通る（テストで確かめた）
+- `!existsAfter`（書き込みの**後**の状態）なら、相手が同じバッチで作られることも見える。墓標・注文は、イベントの削除中以外は消せないため、「後に無い」は「前にも無い」を含む。読み取りの回数は変わらない
+- アプリの確定・やめるは、どちらか一方しか書かないため、これまでも起こらない。メンバーがわざと行う場合への備え（[ADR-0004](../adr/0004-void-tombstone.md) の追記）
 
 ## 6. 想定するリスクと、公開時の追加対策
 
