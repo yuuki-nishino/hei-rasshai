@@ -1,0 +1,163 @@
+.page {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.h2 {
+  font-family: var(--font-hand);
+  font-size: var(--fs-xl);
+  font-weight: 400;
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+.count {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 追加フォーム：名前（広く）＋価格＋追加 */
+.add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7.5em;
+  gap: var(--sp-3);
+  align-items: end;
+  padding: var(--sp-4);
+  border-radius: var(--radius-md);
+  background: var(--color-nature-bg);
+}
+
+.addButton {
+  grid-column: 1 / -1;
+}
+
+.list {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7.5em;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.soldOutItem {
+  background: var(--color-bg);
+  box-shadow: none;
+}
+
+/* 名前・価格のインライン編集。枠は薄く、触ると分かるように */
+.input {
+  min-height: var(--tap-min);
+  width: 100%;
+  padding: var(--sp-1) var(--sp-2);
+  border: 2px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--fs-md);
+}
+
+.name {
+  font-family: var(--font-hand);
+  font-size: var(--fs-lg);
+}
+
+.price {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.input:focus-visible {
+  outline-offset: 0;
+  border-color: var(--color-focus);
+}
+
+.priceWrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.yen {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+}
+
+.controls {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.move {
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border: 2px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--fs-md);
+  cursor: pointer;
+}
+
+.move[aria-disabled='true'] {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* 売り切れの切り替え。状態は色と文字の両方で示す */
+.toggle {
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-3);
+  border: 2px solid var(--status-ready-fg);
+  border-radius: var(--radius-pill);
+  background: var(--status-ready-bg);
+  color: var(--status-ready-fg);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.toggle[aria-pressed='true'] {
+  border-color: var(--status-void-fg);
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.rowError {
+  grid-column: 1 / -1;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--status-void-fg);
+}
+
+.error {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}

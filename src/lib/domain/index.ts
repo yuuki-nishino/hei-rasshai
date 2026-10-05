@@ -4,3 +4,4 @@ export * from './day';
 export * from './event';
 export * from './invite';
 export * from './cacheClear';
+export * from './menu';
