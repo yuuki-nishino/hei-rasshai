@@ -92,6 +92,7 @@ maido-ookini/
 - `firebase.json`：
   - rewrite：`/s` → `/customer.html`、その他 → `/index.html`
   - ヘッダー：`Referrer-Policy: same-origin`、`X-Content-Type-Options: nosniff`。Service Workerのファイルは、キャッシュしない（`Cache-Control: no-cache`）
+  - **キャッシュ**（#6）：HTML（`/`・`/s` など、`/assets` 以外のすべて）は `Cache-Control: no-cache`（使う前に、毎回、新しいかをサーバーに確かめる。変わっていなければ、本文は送られない）。ファイル名にハッシュが付く `/assets/**` は `public, max-age=31536000, immutable`（中身が変わればファイル名も変わるため、1年キャッシュしてよい）。Firebase Hosting の既定（`max-age=3600`）のままだと、デプロイし直しても、端末によっては最大1時間、古い画面が出るため。`firebase.json` では、後に書いたルールが、同じヘッダーを上書きする（Emulator・dev で確認）
   - **クリックジャッキング対策**：`Content-Security-Policy: frame-ancestors 'self'`（と、古いブラウザ向けに `X-Frame-Options: SAMEORIGIN`）。他のサイトから、画面を `iframe` で埋め込まれ、取り消しなどを押させられるのを防ぐ。`'none'` ではなく `'self'` にするのは、`authDomain` をHostingと同じドメインにしたとき、Firebase Authの `iframe`（同じドメインの `/__/auth/iframe`）を、阻害しないため
   - CSP全体（`script-src` など）は、Firebase AuthとGoogleのスクリプト・Viteのインライン処理との兼ね合いが大きく、今回は見送る
 - ★W1 Service Workerのスコープと、`/s` の関係（お客様画面に影響しないこと。ナビゲーションのフォールバックから `/s` を除外する）
@@ -134,7 +135,7 @@ npx firebase deploy -P dev --only firestore:rules   # ルールだけ（ルー�
 - dev は、1つの環境を、すべての PR で共有する。**最後にデプロイした PR の状態**になる。ルールも、プロジェクト全体に効く。そのため、別の PR を確かめるときは、そのブランチで、デプロイし直す
 - デプロイの後に確かめること：
   - `https://maido-ookini-dev.web.app/`（スタッフ用）と `/s`（お客様用）が開く
-  - 応答のヘッダー（`Referrer-Policy`・`X-Content-Type-Options`・`Content-Security-Policy: frame-ancestors 'self'`・`X-Frame-Options`）。`curl -sI https://maido-ookini-dev.web.app/s`
+  - 応答のヘッダー（`Referrer-Policy`・`X-Content-Type-Options`・`Content-Security-Policy: frame-ancestors 'self'`・`X-Frame-Options`・`Cache-Control`）。`curl -sI https://maido-ookini-dev.web.app/s`
   - ルールを変えた PR では、反映されたルールが、手元の `firestore.rules` と一致すること
 - Authの承認済みドメイン：`maido-ookini-dev.web.app`・`maido-ookini-dev.firebaseapp.com`・`localhost` は、プロジェクトの作成時に、自動で入っている（#6 で確認）。独自ドメインを使うときだけ、追加する
 
