@@ -92,7 +92,7 @@ export function watchMyEvents(
  *    通信できなければ AppError('offline')（この取得が、オンラインの確認を兼ねる）
  * 2. メンバー作成＋招待の削除を1バッチで書く。招待が無い・期限切れ・別のアカウント・削除中のイベントは、AppError('permission')
  * 書き込みが8秒で終わらなければ AppError('timeout')。送信待ちは端末に残り、つながり直したときに通ることがある。
- * もう一度呼ぶと、1. で「すでにメンバー」と分かるため、二重にはならない
+ * もう一度呼ぶと、1. で「すでにメンバー」と分かるため、二重にはならない（送信待ちと重なっても、バッチの失敗の後に確かめ直す。J2）
  */
 export async function joinEvent(eventId: string, user: AuthUser): Promise<'joined' | 'already'> {
   const memberRef = doc(db, 'events', eventId, 'members', user.uid);
