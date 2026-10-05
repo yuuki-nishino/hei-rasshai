@@ -135,6 +135,7 @@
 
 - 仕組み（#7）：`lib/data` が使う `db` を、`vi.mock` で、テストの利用者の `db` に差し替える。利用者の `db` は、modular SDK を Emulator につなぎ、`mockUserToken` でログイン済みにする（ルールが効く）。キャッシュは、メモリ＋LRU（取得した文書が、オフラインでも残る。本番の永続キャッシュの代わり）。`test/data/helpers.ts`
 - #7 の結果：15・16b・21・23（`createEvent`）・26 は `test/data/events.test.ts` で確認した。**16a**（`permission-denied`）は、Emulator では作りにくい（購読の結果に出る `members` は、自分がメンバーであることを意味するため）ので、判定の部分を単体テスト（`src/lib/data/myEvents.test.ts`）で確かめた。15・16b も、判定の全分岐を単体テストで確かめている
+- #8 の結果：10（参加・2回目は `already`・別のアカウント・使い切り）と、23（`createInvite`・`cancelInvite`・`joinEvent` のオフライン）を `test/data/invites.test.ts` で確認した。期限切れ（25時間前の招待）・削除中のイベントへの参加の拒否も確かめた
 - #7 で分かったこと：ルールの文字数は UTF-16 の単位（絵文字は2文字）。画面の検査と `displayName` の切り詰めを、これに合わせた（data-model.md §2）
 
 ## 5. 実機の確認（手動）

@@ -18,7 +18,7 @@ import { db } from '../firebase/staff';
 import type { AuthUser } from './auth';
 import { AppError, toAppError } from './errors';
 import { resolveMyEvents, type EventFetch, type ServerCheck } from './myEvents';
-import { assertOnline } from './online';
+import { assertOnline, withTimeout } from './online';
 import type { EventDoc, MyEventsMeta, Unsubscribe } from './types';
 
 function toEventDoc(snap: DocumentSnapshot): EventDoc {
@@ -84,6 +84,33 @@ export function watchMyEvents(
     latest = -1;
     unsubscribe();
   };
+}
+
+/**
+ * 招待を受けて参加する（オンライン必須。screens.md §3.3、security-rules.md §4）。
+ * 1. members/{自分} を getDocFromServer で確かめる。あれば 'already'。permission-denied は「メンバーではない」。
+ *    通信できなければ AppError('offline')（この取得が、オンラインの確認を兼ねる）
+ * 2. メンバー作成＋招待の削除を1バッチで書く。招待が無い・期限切れ・別のアカウント・削除中のイベントは、AppError('permission')
+ */
+export async function joinEvent(eventId: string, user: AuthUser): Promise<'joined' | 'already'> {
+  const memberRef = doc(db, 'events', eventId, 'members', user.uid);
+  try {
+    const snap = await withTimeout(getDocFromServer(memberRef));
+    if (snap.exists()) return 'already';
+  } catch (e) {
+    const err = toAppError(e);
+    if (err.code !== 'permission') throw err.code === 'timeout' ? new AppError('offline', { cause: e }) : err;
+  }
+  const email = (user.email ?? '').toLowerCase();
+  const batch = writeBatch(db);
+  batch.set(memberRef, { uid: user.uid, role: 'member', displayName: memberDisplayName(user), email, joinedAt: serverTimestamp() });
+  batch.delete(doc(db, 'events', eventId, 'invites', email));
+  try {
+    await batch.commit();
+  } catch (e) {
+    throw toAppError(e);
+  }
+  return 'joined';
 }
 
 /**

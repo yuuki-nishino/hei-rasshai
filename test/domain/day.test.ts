@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDay, formatDayRange, isValidDay, toDay } from '../../src/lib/domain';
+import { formatDateTime, formatDay, formatDayRange, isValidDay, toDay } from '../../src/lib/domain';
 
 describe('toDay', () => {
   it('Asia/Tokyo の暦日を返す（UTC では前日の 15:00 以降が、翌日になる）', () => {
@@ -21,5 +21,12 @@ describe('formatDay / formatDayRange', () => {
   it('同じ日なら1つ、違えば「〜」でつなぐ', () => {
     expect(formatDayRange('2026-08-01', '2026-08-01')).toBe('8月1日（土）');
     expect(formatDayRange('2026-08-01', '2026-08-02')).toBe('8月1日（土）〜8月2日（日）');
+  });
+});
+
+describe('formatDateTime', () => {
+  it('Asia/Tokyo の日付と、24時間制の時刻', () => {
+    expect(formatDateTime(new Date('2026-08-01T05:05:00Z'))).toBe('8月1日（土）14:05');
+    expect(formatDateTime(new Date('2026-07-31T15:00:00Z'))).toBe('8月1日（土）00:00');
   });
 });

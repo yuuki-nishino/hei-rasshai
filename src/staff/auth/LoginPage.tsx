@@ -4,6 +4,7 @@ import { AppError } from '../../lib/data/errors';
 import { signInWithGoogle } from '../../lib/data/auth';
 import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
+import { joinEventId } from '../../state/route';
 import styles from './LoginPage.module.css';
 
 function messageOf(e: unknown): string {
@@ -34,6 +35,9 @@ export function LoginPage() {
       <div class={styles.panel}>
         <Logo />
         <p class={styles.tagline}>注文の受付・呼び出し・売上を、スマホひとつで</p>
+        {joinEventId.value !== null && (
+          <p class={styles.invite}>招待を受け取るには、招待されたGoogleアカウントで、ログインしてください</p>
+        )}
         <div class={styles.actions}>
           <Button variant="primary" big block onClick={login}>
             Googleでログイン

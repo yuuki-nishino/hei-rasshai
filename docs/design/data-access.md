@@ -55,7 +55,7 @@ type Unsubscribe = () => void;
 | `createEvent(input, user): Promise<string>` | **オンライン必須**（[§3.9](#39-オンライン必須の書き込み)）。イベント（`deleting = false`）＋オーナーの `members` を、1バッチで作成。`eventId` を返す。`displayName` は §3.9 の規則 |
 | `updateEvent(eventId, patch): Promise<void>` | 名前・日付・準備金 |
 | `deleteEventDeep(eventId, onProgress): Promise<void>` | **オンライン必須**。配下を削除（[§7](#7-イベント削除)） |
-| `joinEvent(eventId, user): Promise<void>` | **オンライン必須**。すでにメンバーなら何もしない。そうでなければ、メンバー作成＋招待の削除（1バッチ）。最初の確認は、`members/{uid}` の `getDocFromServer`（`permission-denied` は「メンバーではない」と判断する）。`displayName` は §3.9 の規則 |
+| `joinEvent(eventId, user): Promise<'joined' \| 'already'>` | **オンライン必須**。すでにメンバーなら何もしない（`'already'`）。そうでなければ、メンバー作成＋招待の削除（1バッチ）。最初の確認は、`members/{uid}` の `getDocFromServer`（`permission-denied` は「メンバーではない」と判断する。この取得がオンラインの確認を兼ね、8秒で応答がなければ `offline`）。招待が無い・期限切れ・別のアカウント・削除中のイベントは、`permission`。`displayName` は §3.9 の規則 |
 
 **`watchMyEvents` の孤立の掃除（自分の `members` の削除）の条件**（判定は `lib/data/myEvents.ts` の `resolveMyEvents`。Firestore に依存させず、単体テストで全分岐を確かめる。#7）
 - 一覧の表示（キャッシュ可）と、削除の判定（サーバー必須）は、分ける。**判定のための `getDocFromServer` が失敗しても、一覧からは消さない**（キャッシュのイベントを出し続ける）
@@ -69,9 +69,9 @@ type Unsubscribe = () => void;
 | 関数 | 内容 |
 |---|---|
 | `watchMembers(eventId, cb, onError): Unsubscribe` | |
-| `watchInvites(eventId, cb, onError): Unsubscribe` | オーナー用 |
-| `createInvite(eventId, email, uid): Promise<void>` | **オンライン必須**。メールを小文字・前後の空白除去。`createdAt = serverTimestamp`。同じ相手には上書き（再発行＝期限が、その時点から1日） |
-| `cancelInvite(eventId, email): Promise<void>` | |
+| `watchInvites(eventId, cb: (invites: Invite[]) => void, onError): Unsubscribe` | オーナー用。発行の新しい順。`createdAt` は、書き込み直後は見積もりの時刻（`serverTimestamps: 'estimate'`）。期限は `inviteExpiresAt` |
+| `createInvite(eventId, email, uid): Promise<void>` | **オンライン必須**。メールは、画面で `normalizeInviteEmail`（`lib/domain/invite.ts`：前後の空白除去・小文字・形の確認）を通したもの。`createdAt = serverTimestamp`。同じ相手には上書き（再発行＝期限が、その時点から1日） |
+| `cancelInvite(eventId, email): Promise<void>` | **オンライン必須** |
 | `removeMember(eventId, uid): Promise<void>` | オーナー用（他のメンバーのみ）。自分自身の削除（抜ける）にも使う（メンバーのみ。オーナーは不可） |
 
 ### 3.4 menu.ts

@@ -17,6 +17,16 @@
   color: var(--color-ink-sub);
 }
 
+.invite {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-nature-bg);
+  color: var(--color-ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: center;
+}
+
 .actions {
   display: grid;
   gap: var(--sp-3);
