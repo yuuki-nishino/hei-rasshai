@@ -203,7 +203,7 @@ Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／
 | U1 | Googleログイン（popup / redirect、`authDomain`）。Safariのタブはマイルストーン1、ホーム画面アプリは、追加を勧める前に確認 | マイルストーン1・7、実機 |
 | U4 | イベント削除（Cloud Functionsなしで、配下を消す）の件数・時間・中断時の動作 | マイルストーン8 |
 | R1〜R11 | ルールの検証項目（[security-rules.md](./design/security-rules.md) §5）。**R8（墓標の排他）が、確定フローの安全性の要** | マイルストーン1・Emulator |
-| W1 | Service Workerと `/s` の関係（お客様画面に影響しないこと） | マイルストーン5・7 |
+| W1 | Service Workerと `/s` の関係（お客様画面に影響しないこと） | マイルストーン5・7。**`/s` の配信は #6 で確認済み**（dev で、`/s`・`/s?e=…&o=…` がお客様用の `customer.html` を、`/join` などそれ以外がスタッフ用の `index.html` を返す。ヘッダーも付く）。Service Worker との関係は M7 |
 | W2 | `frame-ancestors 'self'` が、Googleログインに影響しないこと | マイルストーン1・実機 |
 | F1 | お客様画面の初回JavaScriptが、gzip後200KB以下か（Firestore SDKの大きさ）。#2の時点で、Preact＋Firestore（メモリキャッシュ・`getDoc` 1回）で、約137KB | マイルストーン5 |
 | N1 | 接続状態の推定（`fromCache` が10秒続いたらオフライン）が、実機で、遅すぎ・早すぎないか | マイルストーン7 |
