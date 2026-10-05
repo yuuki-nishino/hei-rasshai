@@ -15,13 +15,20 @@ vi.mock('../../src/lib/firebase/staff', async () => {
 });
 
 // 確認（getDocFromServer）の直後に通信が切れる場合を作るため、getDocFromServer の後に処理を差し込めるようにする（PR #33 のレビュー J1）
-const hooks = vi.hoisted(() => ({ afterServerRead: null as null | (() => Promise<void>) }));
+const hooks = vi.hoisted(() => ({
+  afterServerRead: null as null | (() => Promise<void>),
+  /** 次の getDocFromServer を、この失敗にする（1回だけ） */
+  failNextServerRead: null as null | Error,
+}));
 vi.mock('firebase/firestore', async (importOriginal) => {
   const m = await importOriginal<typeof import('firebase/firestore')>();
   return {
     ...m,
     getDocFromServer: async (...args: Parameters<typeof m.getDocFromServer>) => {
+      const fail = hooks.failNextServerRead;
+      hooks.failNextServerRead = null;
       try {
+        if (fail) throw fail;
         return await m.getDocFromServer(...args);
       } finally {
         const hook = hooks.afterServerRead;
@@ -162,6 +169,18 @@ describe('参加（joinEvent）', () => {
     // 既知の制約：送信待ちは端末に残り、つながり直したときに送られる。もう一度呼ぶと、すでにメンバーと分かる
     await enableNetwork(db);
     await vi.waitFor(async () => expect(await read(`events/e1/members/${BOB}`)).toBeDefined(), { timeout: 8000 });
+    expect(await joinEvent('e1', authUser(BOB))).toBe('already');
+  });
+
+  it('J2：確認の後に、前回の送信待ちが先に通っていた（バッチが permission）なら、確かめ直して already', async () => {
+    await seedInvite(emailOf(BOB), hoursAgo(1));
+    // 前回の参加が、確認の後にサーバーへ届いた状態を作る：メンバーはあるが、最初の確認は「メンバーではない」と答える
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`events/e1/members/${BOB}`).set({ uid: BOB, role: 'member', displayName: 'b', email: emailOf(BOB), joinedAt: hoursAgo(0) });
+      await ctx.firestore().doc(`events/e1/invites/${emailOf(BOB)}`).delete();
+    });
+    setUser(BOB);
+    hooks.failNextServerRead = Object.assign(new Error('permission-denied'), { code: 'permission-denied' });
     expect(await joinEvent('e1', authUser(BOB))).toBe('already');
   });
 

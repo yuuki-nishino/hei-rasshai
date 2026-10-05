@@ -96,13 +96,17 @@ export function watchMyEvents(
  */
 export async function joinEvent(eventId: string, user: AuthUser): Promise<'joined' | 'already'> {
   const memberRef = doc(db, 'events', eventId, 'members', user.uid);
-  try {
-    const snap = await withTimeout(getDocFromServer(memberRef));
-    if (snap.exists()) return 'already';
-  } catch (e) {
-    const err = toAppError(e);
-    if (err.code !== 'permission') throw err.code === 'timeout' ? new AppError('offline', { cause: e }) : err;
-  }
+  // サーバーで、メンバーか確かめる。permission-denied は「メンバーではない」
+  const isMemberOnServer = async (): Promise<boolean> => {
+    try {
+      return (await withTimeout(getDocFromServer(memberRef))).exists();
+    } catch (e) {
+      const err = toAppError(e);
+      if (err.code === 'permission') return false;
+      throw err.code === 'timeout' ? new AppError('offline', { cause: e }) : err;
+    }
+  };
+  if (await isMemberOnServer()) return 'already';
   const email = (user.email ?? '').toLowerCase();
   const batch = writeBatch(db);
   batch.set(memberRef, { uid: user.uid, role: 'member', displayName: memberDisplayName(user), email, joinedAt: serverTimestamp() });
@@ -110,7 +114,11 @@ export async function joinEvent(eventId: string, user: AuthUser): Promise<'joine
   try {
     await withTimeout(batch.commit()); // 確認の後に通信が切れても、止まったままにしない（PR #33 のレビュー J1）
   } catch (e) {
-    throw toAppError(e);
+    const err = toAppError(e);
+    // 前回の時間切れで残った送信待ちが、確認の後に先に通ると、今回のバッチは「既存のメンバーの上書き」として拒否される。
+    // そのときは、もう一度だけ確かめ、メンバーなら参加できている（PR #33 の再レビュー J2）
+    if (err.code === 'permission' && (await isMemberOnServer().catch(() => false))) return 'already';
+    throw err;
   }
   return 'joined';
 }
