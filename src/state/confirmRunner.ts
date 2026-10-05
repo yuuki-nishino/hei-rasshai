@@ -40,6 +40,7 @@ export function createConfirmRunner(deps: ConfirmDeps, store: { get(): ConfirmSt
   };
 
   async function runConfirm(ctx: ConfirmContext) {
+    const deadline = Date.now() + timeoutMs; // 確定を始めてから8秒で、必ず結果を出す（PR #39 のレビュー C2）
     let reason: FailReason;
     try {
       const r = await race(deps.confirmOrder(ctx), timeoutMs);
@@ -51,8 +52,10 @@ export function createConfirmRunner(deps: ConfirmDeps, store: { get(): ConfirmSt
     } catch (e) {
       const code = codeOf(e);
       if (code === 'permission') {
-        // 墓標があれば「やめた注文」（order-confirm.md §5.1）。確かめられなければ、権限の文言
-        reason = (await deps.voidExists(ctx.orderId).catch(() => false)) ? 'voided' : 'permission';
+        // 墓標があれば「やめた注文」（order-confirm.md §5.1）。無ければ権限の文言。
+        // 確かめられない（失敗・残りの時間切れ）ときは、登録されたか分からないので timeout（もう一度試す・やめるで確かめる）
+        const exists = await race(deps.voidExists(ctx.orderId), Math.max(0, deadline - Date.now())).catch(() => TIMEOUT);
+        reason = exists === TIMEOUT ? 'timeout' : exists ? 'voided' : 'permission';
       } else {
         reason = code === 'offline' ? 'offline' : code === 'timeout' ? 'timeout' : 'conflict';
       }
@@ -67,9 +70,13 @@ export function createConfirmRunner(deps: ConfirmDeps, store: { get(): ConfirmSt
       if (r === TIMEOUT) dispatch({ type: 'unverifiable' });
       else if (r.result === 'found') dispatch({ type: 'found', order: r.order });
       else dispatch({ type: 'voided' });
-    } catch {
+    } catch (e) {
+      if (!still('abandoning', ctx.orderId)) return;
+      // 権限で断られた（メンバーでない・イベントの削除中）：通信の問題ではない。注文も登録されていない（確定も断られている）。
+      // 「確認できない」にすると、何度確かめても抜けられないため、知らせて戻す（PR #39 のレビュー C3）
+      if (codeOf(e) === 'permission') dispatch({ type: 'blocked' });
       // 通信できない・そのほかの失敗：確認できない（墓標が遅れて書かれても、意図した結果なので問題ない）
-      if (still('abandoning', ctx.orderId)) dispatch({ type: 'unverifiable' });
+      else dispatch({ type: 'unverifiable' });
     }
   }
 
@@ -99,6 +106,10 @@ export function createConfirmRunner(deps: ConfirmDeps, store: { get(): ConfirmSt
       dispatch({ type: 'recheck' });
       const s = store.get();
       if (s.kind === 'abandoning') void runAbandon(s.ctx);
+    },
+    /** やめた扱いと分かっている注文を、問い合わせずに閉じる（カートは残す） */
+    dismiss(): void {
+      dispatch({ type: 'dismiss' });
     },
     close(): void {
       dispatch({ type: 'close' });

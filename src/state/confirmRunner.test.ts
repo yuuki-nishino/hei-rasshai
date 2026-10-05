@@ -106,6 +106,42 @@ describe('createConfirmRunner', () => {
     expect(b.state()).toMatchObject({ kind: 'failed', reason: 'permission' });
   });
 
+  it('permission の後の墓標の確認も、確定を始めてから8秒で打ち切る。分からないので timeout（レビュー C2）', async () => {
+    const rejectAt7s = () => new Promise<ConfirmedOrder>((_, reject) => setTimeout(() => reject({ code: 'permission' }), 7000));
+    const { runner, state } = setup({ confirmOrder: rejectAt7s, voidExists: () => new Promise(() => {}) });
+    runner.submit(ctx);
+    await vi.advanceTimersByTimeAsync(7999);
+    expect(state().kind).toBe('submitting');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(state()).toMatchObject({ kind: 'failed', reason: 'timeout' });
+  });
+
+  it('墓標の確認が失敗したときも、分からないので timeout', async () => {
+    const { runner, state } = setup({ confirmOrder: async () => Promise.reject({ code: 'permission' }), voidExists: async () => Promise.reject({ code: 'offline' }) });
+    runner.submit(ctx);
+    await flush();
+    expect(state()).toMatchObject({ kind: 'failed', reason: 'timeout' });
+  });
+
+  it('やめた扱い（voided）の「確定せずに戻る」は、問い合わせない（レビュー C1）', async () => {
+    const voidOrFind = vi.fn(() => new Promise<{ result: 'voided' }>(() => {}));
+    const { runner, state } = setup({ confirmOrder: async () => Promise.reject({ code: 'permission' }), voidExists: async () => true, voidOrFind });
+    runner.submit(ctx);
+    await flush();
+    runner.dismiss();
+    expect(state()).toEqual({ kind: 'idle', notice: 'voided' });
+    expect(voidOrFind).not.toHaveBeenCalled();
+  });
+
+  it('やめるが権限で断られた（メンバーでない・削除中）：確認できないではなく、知らせて idle（レビュー C3）', async () => {
+    const { runner, state } = setup({ confirmOrder: async () => Promise.reject({ code: 'permission' }), voidOrFind: async () => Promise.reject({ code: 'permission' }) });
+    runner.submit(ctx);
+    await flush();
+    runner.abandon();
+    await flush();
+    expect(state()).toEqual({ kind: 'idle', notice: 'blocked' });
+  });
+
   it('そのほかの失敗は conflict（「もう一度試してください」）', async () => {
     const { runner, state } = setup({ confirmOrder: async () => Promise.reject({ code: 'unknown' }) });
     runner.submit(ctx);

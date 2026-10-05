@@ -69,4 +69,5 @@ function newContext(eventId: string): ConfirmContext {
 export const retryConfirm = (eventId: string, uid: string) => runnerFor(eventId, uid).retry();
 export const abandonConfirm = (eventId: string, uid: string) => runnerFor(eventId, uid).abandon();
 export const recheckConfirm = (eventId: string, uid: string) => runnerFor(eventId, uid).recheck();
+export const dismissConfirm = () => runner?.dismiss();
 export const closeConfirm = () => runner?.close();

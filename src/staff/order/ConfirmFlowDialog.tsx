@@ -23,10 +23,12 @@ type Props = {
   onAbandon: () => void;
   onRecheck: () => void;
   onResubmit: () => void;
+  /** やめた扱いの注文を、問い合わせずに閉じる */
+  onDismiss: () => void;
   onClose: () => void;
 };
 
-export function ConfirmFlowDialog({ state, eventId, onRetry, onAbandon, onRecheck, onResubmit, onClose }: Props) {
+export function ConfirmFlowDialog({ state, eventId, onRetry, onAbandon, onRecheck, onResubmit, onDismiss, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const open = state.kind !== 'idle';
 
@@ -89,7 +91,8 @@ export function ConfirmFlowDialog({ state, eventId, onRetry, onAbandon, onRechec
                   もう一度試す
                 </Button>
               )}
-              <Button variant="secondary" block onClick={onAbandon}>
+              {/* やめた扱いと分かっている注文は、問い合わせずに戻る（カートは残す） */}
+              <Button variant="secondary" block onClick={state.reason === 'voided' ? onDismiss : onAbandon}>
                 {state.reason === 'voided' ? '確定せずに戻る' : 'やめる'}
               </Button>
             </div>

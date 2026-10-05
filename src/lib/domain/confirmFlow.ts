@@ -33,7 +33,8 @@ export interface ConfirmedOrder {
 export type FailReason = 'offline' | 'timeout' | 'permission' | 'conflict' | 'voided';
 
 export type ConfirmState =
-  | { kind: 'idle'; notice: 'voided' | null }
+  /** notice：voided＝やめた扱いにした。blocked＝このイベントでは、いま注文を登録できない（メンバーでない・削除中。PR #39 のレビュー C3） */
+  | { kind: 'idle'; notice: 'voided' | 'blocked' | null }
   | { kind: 'submitting'; ctx: ConfirmContext }
   | { kind: 'failed'; ctx: ConfirmContext; reason: FailReason }
   | { kind: 'abandoning'; ctx: ConfirmContext }
@@ -50,6 +51,10 @@ export type ConfirmEvent =
   | { type: 'failed'; reason: FailReason }
   /** やめる（failed・decide から）→ void-or-find */
   | { type: 'abandon' }
+  /** やめた扱いと分かっている注文（failed・voided）を、問い合わせずに閉じる。カートは残す（PR #39 のレビュー C1） */
+  | { type: 'dismiss' }
+  /** やめる処理が、権限で断られた（メンバーでない・削除中）。注文は登録されていない（確定も断られている） */
+  | { type: 'blocked' }
   /** void-or-find の結果 */
   | { type: 'found'; order: ConfirmedOrder }
   | { type: 'voided' }
@@ -79,7 +84,11 @@ export function confirmReducer(s: ConfirmState, e: ConfirmEvent): ConfirmState {
     case 'failed':
       return s.kind === 'submitting' ? { kind: 'failed', ctx: s.ctx, reason: e.reason } : s;
     case 'abandon':
-      return s.kind === 'failed' || s.kind === 'decide' ? { kind: 'abandoning', ctx: s.ctx } : s;
+      return (s.kind === 'failed' && s.reason !== 'voided') || s.kind === 'decide' ? { kind: 'abandoning', ctx: s.ctx } : s;
+    case 'dismiss':
+      return s.kind === 'failed' && s.reason === 'voided' ? { kind: 'idle', notice: 'voided' } : s;
+    case 'blocked':
+      return s.kind === 'abandoning' ? { kind: 'idle', notice: 'blocked' } : s;
     case 'found':
       // 登録されていた → 成功扱い（やめない）
       return s.kind === 'abandoning' ? { kind: 'done', ctx: s.ctx, order: e.order, recovered: true } : s;

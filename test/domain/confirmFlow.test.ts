@@ -51,6 +51,21 @@ describe('confirmReducer', () => {
     expect(confirmReducer(s, { type: 'submit', ctx: next })).toEqual({ kind: 'submitting', ctx: next });
   });
 
+  it('やめた扱い（failed・voided）の「確定せずに戻る」は、問い合わせずに idle（PR #39 のレビュー C1）', () => {
+    const s = run({ type: 'submit', ctx }, { type: 'failed', reason: 'voided' });
+    expect(confirmReducer(s, { type: 'dismiss' })).toEqual({ kind: 'idle', notice: 'voided' });
+    expect(confirmReducer(s, { type: 'abandon' })).toBe(s); // void-or-find には進まない
+    // ほかの理由の failed は、dismiss できない（登録されたか分からないため、確かめる）
+    const t = run({ type: 'submit', ctx }, { type: 'failed', reason: 'timeout' });
+    expect(confirmReducer(t, { type: 'dismiss' })).toBe(t);
+  });
+
+  it('やめるが権限で断られた（blocked）：idle（「登録できません」の知らせ）。閉じると消える（レビュー C3）', () => {
+    const s = run({ type: 'submit', ctx }, { type: 'failed', reason: 'permission' }, { type: 'abandon' }, { type: 'blocked' });
+    expect(s).toEqual({ kind: 'idle', notice: 'blocked' });
+    expect(confirmReducer(s, { type: 'close' })).toEqual(initialConfirmState);
+  });
+
   it('decide（#14 の復元）：もう一度確定する（同じ orderId）・やめる', () => {
     const decide: ConfirmState = { kind: 'decide', ctx };
     expect(confirmReducer(decide, { type: 'retry' })).toEqual({ kind: 'submitting', ctx });

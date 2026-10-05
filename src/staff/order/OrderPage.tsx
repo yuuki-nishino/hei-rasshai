@@ -25,6 +25,7 @@ import {
   abandonConfirm,
   closeConfirm,
   confirmState,
+  dismissConfirm,
   recheckConfirm,
   resubmitWithNewId,
   retryConfirm,
@@ -82,9 +83,11 @@ export function OrderPage({ eventId }: { eventId: string }) {
 
       <Options />
 
-      {confirmState.value.kind === 'idle' && confirmState.value.notice === 'voided' && (
+      {confirmState.value.kind === 'idle' && confirmState.value.notice !== null && (
         <p class={styles.voidedNotice} role="status">
-          前の注文は、やめた扱いにしました（登録されていません）。カートは、そのまま残っています
+          {confirmState.value.notice === 'voided'
+            ? '前の注文は、やめた扱いにしました（登録されていません）。カートは、そのまま残っています'
+            : 'このイベントでは、いま注文を登録できません（メンバーでなくなったか、イベントの削除中です）。前の注文は、登録されていません'}
           <button type="button" class={styles.noticeButton} onClick={closeConfirm}>
             閉じる
           </button>
@@ -101,6 +104,7 @@ export function OrderPage({ eventId }: { eventId: string }) {
           onAbandon={() => abandonConfirm(eventId, uid)}
           onRecheck={() => recheckConfirm(eventId, uid)}
           onResubmit={() => resubmitWithNewId(eventId, uid)}
+          onDismiss={dismissConfirm}
           onClose={closeConfirm}
         />
       )}
