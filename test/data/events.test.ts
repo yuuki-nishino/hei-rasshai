@@ -42,17 +42,17 @@ beforeEach(async () => {
 });
 
 /** 一覧の購読の、条件に合う結果を待つ */
-function watchUntil(uid: string, ok: (events: EventDoc[], fromCache: boolean) => boolean) {
-  let last: { events: EventDoc[]; fromCache: boolean } | undefined;
+function watchUntil(uid: string, ok: (events: EventDoc[], fromCache: boolean, memberOf: string[]) => boolean) {
+  let last: { events: EventDoc[]; fromCache: boolean; memberOf: string[] } | undefined;
   let error: unknown;
   const unsub = watchMyEvents(
     uid,
-    (events, { fromCache }) => (last = { events, fromCache }),
+    (events, { fromCache, memberOf }) => (last = { events, fromCache, memberOf }),
     (e) => (error = e),
   );
   return waitFor(() => {
     if (error) throw error;
-    return last && ok(last.events, last.fromCache) ? last : undefined;
+    return last && ok(last.events, last.fromCache, last.memberOf) ? last : undefined;
   }).finally(unsub);
 }
 
@@ -123,6 +123,19 @@ describe('watchMyEvents', () => {
     setUser(ALICE);
     const r = await watchUntil(ALICE, (es, fromCache) => !fromCache && es.length > 0);
     expect(r.events.map((e) => e.id)).toEqual(['e1']);
+    expect(r.memberOf).toEqual(['e1']);
+  });
+
+  it('メンバーから外されると、サーバーで確かめた memberOf から消える（選択を外す判定。PR #32 のレビュー E1）', async () => {
+    setUser(ALICE);
+    let last: { fromCache: boolean; memberOf: string[] } | undefined;
+    const unsub = watchMyEvents(ALICE, (_e, meta) => (last = meta), () => {});
+    await waitFor(() => (last && !last.fromCache && last.memberOf.includes('e1') ? true : undefined));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`events/e1/members/${ALICE}`).delete();
+    });
+    await waitFor(() => (last && !last.fromCache && last.memberOf.length === 0 ? true : undefined));
+    unsub();
   });
 
   it('#15：孤立した members（イベントが存在しない）は、サーバーで確かめて削除し、一覧に出さない', async () => {

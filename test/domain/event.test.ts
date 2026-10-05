@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { memberDisplayName, validateEventForm, type EventForm } from '../../src/lib/domain';
+import { isSelectionGone, memberDisplayName, validateEventForm, type EventForm } from '../../src/lib/domain';
 
 const form = (patch: Partial<EventForm> = {}): EventForm => ({
   name: '夏まつり',
@@ -62,5 +62,18 @@ describe('memberDisplayName（testing.md §4 #26 の計算部分）', () => {
     expect(memberDisplayName({ displayName: 'あ'.repeat(61), email: null })).toBe('あ'.repeat(60));
     expect(memberDisplayName({ displayName: '🍜'.repeat(31), email: null })).toBe('🍜'.repeat(30));
     expect(memberDisplayName({ displayName: `あ${'🍜'.repeat(30)}`, email: null })).toBe(`あ${'🍜'.repeat(29)}`); // 59文字
+  });
+});
+
+describe('isSelectionGone（PR #32 のレビュー E1）', () => {
+  it('サーバーで確かめた一覧に、自分の members が無ければ、外れた', () => {
+    expect(isSelectionGone('e1', { fromCache: false, memberOf: ['e2'] })).toBe(true);
+  });
+  it('members があれば、外れていない（イベントの取得に失敗して、一覧に出ていなくても）', () => {
+    expect(isSelectionGone('e1', { fromCache: false, memberOf: ['e1'] })).toBe(false);
+  });
+  it('キャッシュの一覧（オフライン）では、判断しない。選んでいなければ、何もしない', () => {
+    expect(isSelectionGone('e1', { fromCache: true, memberOf: [] })).toBe(false);
+    expect(isSelectionGone(null, { fromCache: false, memberOf: [] })).toBe(false);
   });
 });

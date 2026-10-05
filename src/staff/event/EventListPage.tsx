@@ -6,7 +6,7 @@ import { Noren } from '../../components/Noren';
 import { formatDayRange } from '../../lib/domain/day';
 import { currentUser } from '../../state/auth';
 import { selectEvent } from '../../state/event';
-import { myEvents, myEventsError } from '../../state/myEvents';
+import { myEvents, myEventsError, retryMyEvents } from '../../state/myEvents';
 import { browserOnline } from '../../state/online';
 import { logout } from '../auth/logout';
 import { CreateEventPage } from './CreateEventPage';
@@ -55,11 +55,25 @@ export function EventListPage() {
 function EventList() {
   const data = myEvents.value;
   const error = myEventsError.value;
+  // 購読が失敗すると、Firestore は購読を止める。「やり直す」で購読し直す（レビュー E3）
+  const retry = (
+    <Button variant="secondary" onClick={retryMyEvents}>
+      やり直す
+    </Button>
+  );
   if (!data) {
-    return error ? <ErrorView title="イベント一覧を読み込めませんでした" /> : <Loading label="イベントを読み込み中…" />;
+    return error ? <ErrorView title="イベント一覧を読み込めませんでした">{retry}</ErrorView> : <Loading label="イベントを読み込み中…" />;
   }
+  // 一覧があるときの失敗：古い一覧のまま、知らせる
+  const staleNotice = error && (
+    <div class={styles.notice} role="alert">
+      イベント一覧を更新できませんでした。表示が古い可能性があります
+      {retry}
+    </div>
+  );
   if (data.events.length === 0) {
     // オフラインで、端末にも無いときは、「無い」と言い切らない
+    if (error) return <ErrorView title="イベント一覧を更新できませんでした">{retry}</ErrorView>;
     return data.fromCache ? (
       <Empty title="通信できないため、イベント一覧を確認できません">
         <p>電波の良い場所で、もう一度開いてください</p>
@@ -71,18 +85,21 @@ function EventList() {
     );
   }
   return (
-    <ul class={styles.list}>
-      {data.events.map((e) => (
-        <li key={e.id}>
-          <button type="button" class={styles.item} onClick={() => selectEvent(e.id)}>
-            <span class={styles.name}>
-              {e.name}
-              {e.deleting && <span class={styles.deleting}>削除中</span>}
-            </span>
-            <span class={styles.dates}>{formatDayRange(e.startDate, e.endDate)}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <>
+      {staleNotice}
+      <ul class={styles.list}>
+        {data.events.map((e) => (
+          <li key={e.id}>
+            <button type="button" class={styles.item} onClick={() => selectEvent(e.id)}>
+              <span class={styles.name}>
+                {e.name}
+                {e.deleting && <span class={styles.deleting}>削除中</span>}
+              </span>
+              <span class={styles.dates}>{formatDayRange(e.startDate, e.endDate)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

@@ -51,7 +51,7 @@ type Unsubscribe = () => void;
 ### 3.2 events.ts
 | 関数 | 内容 |
 |---|---|
-| `watchMyEvents(uid, cb: (events: EventDoc[], meta: { fromCache: boolean }) => void, onError): Unsubscribe` | `members` のコレクショングループ（`uid` 一致）を購読し、親のイベントを `getDoc`（**キャッシュも使う**）で取得して一覧にする（開始日の新しい順）。オフラインで起動しても、キャッシュにあるイベントを表示できる（SPEC 7.3）。**孤立の掃除の判定にだけ**、`getDocFromServer` を使う（下記）。`fromCache`：サーバーで確かめていない一覧（0件のとき、画面は「イベントがありません」と言い切らない。#7）。親のイベントは1回だけ取るため、イベントの変更（名前・削除中）は、購読し直すまで反映されない。画面は、一覧に戻るたびに購読し直す（screens.md §3.2） |
+| `watchMyEvents(uid, cb: (events: EventDoc[], meta: { fromCache: boolean; memberOf: string[] }) => void, onError): Unsubscribe` | `members` のコレクショングループ（`uid` 一致）を購読し、親のイベントを `getDoc`（**キャッシュも使う**）で取得して一覧にする（開始日の新しい順）。オフラインで起動しても、キャッシュにあるイベントを表示できる（SPEC 7.3）。**孤立の掃除の判定にだけ**、`getDocFromServer` を使う（下記）。`fromCache`：サーバーで確かめていない一覧（0件のとき、画面は「イベントがありません」と言い切らない。#7）。`memberOf`：自分の `members` があるイベントのID（表示できないものも含む。選んでいるイベントから外れたかの判定に使う。PR #32 のレビュー E1）。親のイベントは1回だけ取るため、イベントの変更（名前・削除中）は、購読し直すまで反映されない。画面は、一覧に戻るたびに購読し直す（screens.md §3.2） |
 | `createEvent(input, user): Promise<string>` | **オンライン必須**（[§3.9](#39-オンライン必須の書き込み)）。イベント（`deleting = false`）＋オーナーの `members` を、1バッチで作成。`eventId` を返す。`displayName` は §3.9 の規則 |
 | `updateEvent(eventId, patch): Promise<void>` | 名前・日付・準備金 |
 | `deleteEventDeep(eventId, onProgress): Promise<void>` | **オンライン必須**。配下を削除（[§7](#7-イベント削除)） |

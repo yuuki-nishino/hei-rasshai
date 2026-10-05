@@ -83,6 +83,9 @@
 }
 
 .notice {
+  display: grid;
+  gap: var(--sp-2);
+  justify-items: start;
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--radius-sm);
   background: var(--status-cooking-bg);

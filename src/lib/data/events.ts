@@ -19,7 +19,7 @@ import type { AuthUser } from './auth';
 import { AppError, toAppError } from './errors';
 import { resolveMyEvents, type EventFetch, type ServerCheck } from './myEvents';
 import { assertOnline } from './online';
-import type { EventDoc, Unsubscribe } from './types';
+import type { EventDoc, MyEventsMeta, Unsubscribe } from './types';
 
 function toEventDoc(snap: DocumentSnapshot): EventDoc {
   const d = snap.data()!;
@@ -57,11 +57,12 @@ const myEventsDeps = (uid: string) => ({
  * 自分がメンバーのイベントの一覧を購読する（開始日の新しい順）。
  * members のコレクショングループを購読し、親のイベントを getDoc（キャッシュも使う）で取得する。
  * オフラインで起動しても、キャッシュにあるイベントを出す（SPEC 7.3）。孤立の掃除は myEvents.ts。
- * fromCache：サーバーで確かめていない一覧（オフライン）。0件のとき、画面は「イベントがありません」と言い切らない
+ * fromCache：サーバーで確かめていない一覧（オフライン）。0件のとき、画面は「イベントがありません」と言い切らない。
+ * memberOf：自分の members があるイベントのID（表示できないものも含む）。選んでいるイベントから外れたかの判定に使う
  */
 export function watchMyEvents(
   uid: string,
-  cb: (events: EventDoc[], meta: { fromCache: boolean }) => void,
+  cb: (events: EventDoc[], meta: MyEventsMeta) => void,
   onError: (e: AppError) => void,
 ): Unsubscribe {
   const deps = myEventsDeps(uid);
@@ -72,9 +73,9 @@ export function watchMyEvents(
     (snap) => {
       const run = ++latest;
       const fromCache = snap.metadata.fromCache;
-      const eventIds = snap.docs.map((d) => d.ref.parent.parent!.id);
-      void resolveMyEvents(eventIds, deps).then((events) => {
-        if (run === latest) cb(events, { fromCache });
+      const memberOf = snap.docs.map((d) => d.ref.parent.parent!.id);
+      void resolveMyEvents(memberOf, deps).then((events) => {
+        if (run === latest) cb(events, { fromCache, memberOf });
       });
     },
     (e) => onError(toAppError(e)),

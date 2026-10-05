@@ -46,6 +46,15 @@ export function validateEventForm(form: EventForm): { ok: true; value: EventInpu
   return { ok: true, value: { name, startDate: form.startDate, endDate: form.endDate, floatCash } };
 }
 
+/**
+ * 選んでいるイベントから、外れたか（PR #32 のレビュー E1）。サーバーで確かめた一覧（fromCache = false）で、
+ * 自分の members が無いときだけ true（イベントが消された・メンバーから外された・別のアカウントでログインした）。
+ * 表示用の一覧ではなく members で見るのは、イベントの取得の一時的な失敗で、選択を外さないため
+ */
+export function isSelectionGone(selectedId: string | null, meta: { fromCache: boolean; memberOf: readonly string[] }): boolean {
+  return selectedId !== null && !meta.fromCache && !meta.memberOf.includes(selectedId);
+}
+
 export const DISPLAY_NAME_MAX = 60;
 
 /**
