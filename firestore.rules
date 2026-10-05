@@ -15,7 +15,8 @@ service cloud.firestore {
     function isMember(e) { return signedIn() && exists(subPath(e, 'members', request.auth.uid)); }
     function isOwner(e)  { return signedIn() && get(eventPath(e)).data.ownerUid == request.auth.uid; }
     function isDeleting(e) { return get(eventPath(e)).data.deleting == true; }
-    // イベントがあり、削除中でない（参加・招待は、削除中・削除後のイベントでは受け付けない）
+    // イベントがあり、削除中でない。削除中・削除後のイベントでは、参加・招待と、新しい文書の作成を受け付けない
+    // （オーナーの members は削除の最後まで残るため、isMember だけでは、イベントが消えた後にも作れてしまう）
     function isActiveEvent(e) { return exists(eventPath(e)) && get(eventPath(e)).data.deleting == false; }
 
     function canCreateEvent() {
@@ -125,7 +126,7 @@ service cloud.firestore {
       // ---------- 墓標（「やめる」で、その注文IDを以後使えなくする） ----------
       match /voids/{orderId} {
         allow get: if isMember(eventId);
-        allow create: if isMember(eventId)
+        allow create: if isMember(eventId) && isActiveEvent(eventId)
           // 書き込みの後に、注文が無い（同じバッチで、注文と墓標を両方作ることも拒否する）
           && !existsAfter(subPath(eventId, 'orders', orderId))
           && request.resource.data.keys().hasOnly(['createdBy', 'createdAt'])
@@ -141,7 +142,7 @@ service cloud.firestore {
         allow get: if true;
         allow list: if isMember(eventId);
 
-        allow create: if isMember(eventId)
+        allow create: if isMember(eventId) && isActiveEvent(eventId)
           // 書き込みの後に、墓標が無い（墓標は、イベントの削除中以外は消せないため、「前に無い」も意味する）
           && !existsAfter(subPath(eventId, 'voids', orderId))
           && request.resource.data.keys().hasOnly(
@@ -208,14 +209,15 @@ service cloud.firestore {
       // ---------- メニュー ----------
       match /menu/{menuId} {
         allow read: if isMember(eventId);
-        allow create, update: if isMember(eventId) && validMenu(request.resource.data);
+        allow create: if isMember(eventId) && isActiveEvent(eventId) && validMenu(request.resource.data);
+        allow update: if isMember(eventId) && validMenu(request.resource.data);
         allow delete: if isMember(eventId);
       }
 
       // ---------- 採番カウンター ----------
       match /counters/{day} {
         allow read: if isMember(eventId);
-        allow create: if isMember(eventId) && validDay(day)
+        allow create: if isMember(eventId) && isActiveEvent(eventId) && validDay(day)
           && request.resource.data.keys().hasOnly(['n']) && request.resource.data.n == 1;
         allow update: if isMember(eventId)
           && request.resource.data.keys().hasOnly(['n'])
@@ -226,7 +228,8 @@ service cloud.firestore {
       // ---------- レジ締め ----------
       match /closings/{day} {
         allow read: if isMember(eventId);
-        allow create, update: if isMember(eventId) && validClosing(request.resource.data, day);
+        allow create: if isMember(eventId) && isActiveEvent(eventId) && validClosing(request.resource.data, day);
+        allow update: if isMember(eventId) && validClosing(request.resource.data, day);
         allow delete: if isOwner(eventId) && isDeleting(eventId);
       }
 
