@@ -21,18 +21,8 @@ import {
   tenderedText,
 } from '../../state/cart';
 import { currentUser } from '../../state/auth';
-import {
-  abandonConfirm,
-  closeConfirm,
-  confirmState,
-  dismissConfirm,
-  recheckConfirm,
-  resubmitWithNewId,
-  retryConfirm,
-  startConfirm,
-} from '../../state/confirm';
+import { closeConfirm, confirmState, startConfirm } from '../../state/confirm';
 import { useMenu } from '../../state/menu';
-import { ConfirmFlowDialog } from './ConfirmFlowDialog';
 import styles from './OrderPage.module.css';
 
 const QUICK = [1000, 5000, 10000] as const;
@@ -96,18 +86,6 @@ export function OrderPage({ eventId }: { eventId: string }) {
 
       <Footer onConfirm={() => uid && startConfirm(eventId, uid)} />
 
-      {uid && (
-        <ConfirmFlowDialog
-          state={confirmState.value}
-          eventId={eventId}
-          onRetry={() => retryConfirm(eventId, uid)}
-          onAbandon={() => abandonConfirm(eventId, uid)}
-          onRecheck={() => recheckConfirm(eventId, uid)}
-          onResubmit={() => resubmitWithNewId(eventId, uid)}
-          onDismiss={dismissConfirm}
-          onClose={closeConfirm}
-        />
-      )}
     </div>
   );
 }

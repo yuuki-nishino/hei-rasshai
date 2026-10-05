@@ -38,7 +38,10 @@ export type ConfirmState =
   | { kind: 'submitting'; ctx: ConfirmContext }
   | { kind: 'failed'; ctx: ConfirmContext; reason: FailReason }
   | { kind: 'abandoning'; ctx: ConfirmContext }
-  | { kind: 'unverifiable'; ctx: ConfirmContext }
+  /** 起動時・復元時の確認（find：注文と墓標をサーバーで確かめる。order-confirm.md §5.3 の 2） */
+  | { kind: 'checking'; ctx: ConfirmContext }
+  /** 確認できない。via：確かめ直すときに、やめる処理（void-or-find）か、確認（find）か */
+  | { kind: 'unverifiable'; ctx: ConfirmContext; via: 'abandon' | 'find' }
   | { kind: 'decide'; ctx: ConfirmContext }
   | { kind: 'done'; ctx: ConfirmContext; order: ConfirmedOrder; recovered: boolean };
 
@@ -61,6 +64,10 @@ export type ConfirmEvent =
   | { type: 'unverifiable' }
   /** 確認できないところから、もう一度確かめる（手動・自動） */
   | { type: 'recheck' }
+  /** 端末に残っていた pending から復元する（idle から）。abandoning なら、やめる処理の続き。そうでなければ確認（find） */
+  | { type: 'restore'; ctx: ConfirmContext; abandoning: boolean }
+  /** 確認（find）で、注文も墓標も無かった → 決めてもらう（decide） */
+  | { type: 'missing' }
   /** 結果の画面を閉じる・知らせを消す */
   | { type: 'close' };
 
@@ -91,14 +98,20 @@ export function confirmReducer(s: ConfirmState, e: ConfirmEvent): ConfirmState {
       return s.kind === 'abandoning' ? { kind: 'idle', notice: 'blocked' } : s;
     case 'found':
       // 登録されていた → 成功扱い（やめない）
-      return s.kind === 'abandoning' ? { kind: 'done', ctx: s.ctx, order: e.order, recovered: true } : s;
+      return s.kind === 'abandoning' || s.kind === 'checking' ? { kind: 'done', ctx: s.ctx, order: e.order, recovered: true } : s;
     case 'voided':
-      return s.kind === 'abandoning' ? { kind: 'idle', notice: 'voided' } : s;
+      return s.kind === 'abandoning' || s.kind === 'checking' ? { kind: 'idle', notice: 'voided' } : s;
+    case 'missing':
+      return s.kind === 'checking' ? { kind: 'decide', ctx: s.ctx } : s;
     case 'unverifiable':
-      return s.kind === 'abandoning' ? { kind: 'unverifiable', ctx: s.ctx } : s;
+      if (s.kind === 'abandoning') return { kind: 'unverifiable', ctx: s.ctx, via: 'abandon' };
+      if (s.kind === 'checking') return { kind: 'unverifiable', ctx: s.ctx, via: 'find' };
+      return s;
     case 'recheck':
-      // 確認できない → やめる処理（void-or-find）をやり直す
-      return s.kind === 'unverifiable' ? { kind: 'abandoning', ctx: s.ctx } : s;
+      // 確認できない → 同じ確かめ方をやり直す
+      return s.kind === 'unverifiable' ? (s.via === 'abandon' ? { kind: 'abandoning', ctx: s.ctx } : { kind: 'checking', ctx: s.ctx }) : s;
+    case 'restore':
+      return s.kind === 'idle' ? (e.abandoning ? { kind: 'abandoning', ctx: e.ctx } : { kind: 'checking', ctx: e.ctx }) : s;
     case 'close':
       return s.kind === 'done' || (s.kind === 'idle' && s.notice !== null) ? initialConfirmState : s;
   }

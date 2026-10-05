@@ -3,7 +3,8 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { Button } from '../../components/Button';
 import { QrCode } from '../../components/QrCode';
-import type { ConfirmState, FailReason } from '../../lib/domain/confirmFlow';
+import type { ConfirmContext, ConfirmState, FailReason } from '../../lib/domain/confirmFlow';
+import { formatDay, toDay } from '../../lib/domain/day';
 import { calcChange, formatYen } from '../../lib/domain/order';
 import { orderUrl } from '../../lib/domain/url';
 import styles from './ConfirmFlowDialog.module.css';
@@ -18,6 +19,8 @@ const FAIL_TEXT: Record<FailReason, { title: string; message: string }> = {
 
 type Props = {
   state: ConfirmState;
+  /** 手動の「もう一度確認」を、裏の処理の途中で押した */
+  recheckBusy: boolean;
   eventId: string;
   onRetry: () => void;
   onAbandon: () => void;
@@ -28,7 +31,7 @@ type Props = {
   onClose: () => void;
 };
 
-export function ConfirmFlowDialog({ state, eventId, onRetry, onAbandon, onRecheck, onResubmit, onDismiss, onClose }: Props) {
+export function ConfirmFlowDialog({ state, recheckBusy, eventId, onRetry, onAbandon, onRecheck, onResubmit, onDismiss, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const open = state.kind !== 'idle';
 
@@ -109,13 +112,27 @@ export function ConfirmFlowDialog({ state, eventId, onRetry, onAbandon, onRechec
             <p class={styles.message}>登録されていなければ、この注文をやめます</p>
           </>
         );
+      case 'checking':
+        return (
+          <>
+            <div class={styles.spinner} aria-hidden="true" />
+            <h2 id="confirm-flow-title" class={styles.title}>
+              前の注文を確かめています…
+            </h2>
+            <p class={styles.message}>前回、確定の途中で終わった注文が、登録されたかを確かめます</p>
+          </>
+        );
       case 'unverifiable':
         return (
           <>
             <h2 id="confirm-flow-title" class={`${styles.title} ${styles.error}`}>
               確認できません
             </h2>
-            <p class={styles.message}>通信できないため、前の注文が登録されたか分かりません。電波の良い場所で「もう一度確認」を押してください</p>
+            <p class={styles.message}>
+              通信できないため、前の注文が登録されたか分かりません。電波の良い場所に移ると、自動で確かめ直します（15秒ごと）。すぐ試すときは「もう一度確認」を押してください
+            </p>
+            <DraftSummary ctx={state.ctx} />
+            {recheckBusy && <p class={styles.note}>確認中です。少し待ってください</p>}
             <div class={styles.actions}>
               <Button variant="primary" big block onClick={onRecheck}>
                 もう一度確認
@@ -123,9 +140,41 @@ export function ConfirmFlowDialog({ state, eventId, onRetry, onAbandon, onRechec
             </div>
           </>
         );
-      case 'decide':
-        // 起動時の復元（#14）
-        return null;
+      case 'decide': {
+        // 前の注文は、登録されていない（注文も墓標も無い）。もう一度確定するか、やめるかを選んでもらう（order-confirm.md §4）
+        const otherDay = state.ctx.day !== toDay();
+        return (
+          <>
+            <h2 id="confirm-flow-title" class={`${styles.title} ${styles.error}`}>
+              前の注文は、登録されていません
+            </h2>
+            <DraftSummary ctx={state.ctx} />
+            {otherDay ? (
+              // 前日の注文を確定すると、前日の日付・番号で登録されるため、やめることをすすめる
+              <>
+                <p class={styles.message}>{formatDay(state.ctx.day)}の注文です。やめることをおすすめします</p>
+                <div class={styles.actions}>
+                  <Button variant="primary" big block onClick={onAbandon}>
+                    やめる
+                  </Button>
+                  <Button variant="secondary" block onClick={onRetry}>
+                    {formatDay(state.ctx.day)}の注文として確定する
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div class={styles.actions}>
+                <Button variant="primary" big block onClick={onRetry}>
+                  もう一度確定する
+                </Button>
+                <Button variant="secondary" block onClick={onAbandon}>
+                  やめる
+                </Button>
+              </div>
+            )}
+          </>
+        );
+      }
       case 'done': {
         const { order, ctx } = state;
         const change = ctx.draft.payment === 'cash' && ctx.tendered > 0 ? calcChange(order.total, ctx.tendered) : null;
@@ -163,4 +212,24 @@ export function ConfirmFlowDialog({ state, eventId, onRetry, onAbandon, onRechec
       }
     }
   }
+}
+
+/** 前の注文の品目と合計（確認できない・決めてもらうとき） */
+function DraftSummary({ ctx }: { ctx: ConfirmContext }) {
+  return (
+    <ul class={styles.draft} aria-label="前の注文の品目">
+      {ctx.draft.items.map((l) => (
+        <li key={l.menuId}>
+          <span>
+            {l.name} × {l.qty}
+          </span>
+          <span>{formatYen(l.price * l.qty)}</span>
+        </li>
+      ))}
+      <li class={styles.draftTotal}>
+        <span>合計（{ctx.draft.payment === 'cash' ? '現金' : 'PayPay'}）</span>
+        <span>{formatYen(ctx.draft.total)}</span>
+      </li>
+    </ul>
+  );
 }

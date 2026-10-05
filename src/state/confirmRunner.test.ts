@@ -1,7 +1,7 @@
 // 確定フローを動かす部分（8秒の時間切れ・遅れた結果・やめる）。偽のタイマーで確かめる（testing.md §2 の confirmReducer）
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialConfirmState, type ConfirmContext, type ConfirmedOrder, type ConfirmState } from '../lib/domain/confirmFlow';
-import { CONFIRM_TIMEOUT_MS, createConfirmRunner, type ConfirmDeps } from './confirmRunner';
+import { CONFIRM_TIMEOUT_MS, createConfirmRunner, type ConfirmDeps, type PendingRecord } from './confirmRunner';
 
 const ctx: ConfirmContext = {
   orderId: 'o1',
@@ -24,16 +24,19 @@ function deferred<T>() {
 
 function setup(deps: Partial<ConfirmDeps>) {
   let state: ConfirmState = initialConfirmState;
+  const saved: (PendingRecord | null)[] = [];
   const runner = createConfirmRunner(
     {
       confirmOrder: () => new Promise(() => {}),
       voidOrFind: () => new Promise(() => {}),
       voidExists: async () => false,
+      findOrder: async () => null,
+      pending: { save: (p) => saved.push(p), clear: () => saved.push(null) },
       ...deps,
     },
     { get: () => state, set: (s) => (state = s) },
   );
-  return { runner, state: () => state };
+  return { runner, state: () => state, saved };
 }
 
 const flush = () => vi.advanceTimersByTimeAsync(0);
@@ -165,20 +168,148 @@ describe('createConfirmRunner', () => {
     expect(b.state()).toEqual({ kind: 'idle', notice: 'voided' });
   });
 
-  it('やめるが、失敗・8秒で応答なし → 確認できない（unverifiable）。もう一度確認で、void-or-find をやり直す', async () => {
+  it('やめるが8秒で応答なし → 確認できない。裏の処理が終わるまで「もう一度確認」は busy。終わったら、void-or-find をやり直す（§5.4）', async () => {
     let calls = 0;
     const { runner, state } = setup({
       confirmOrder: async () => Promise.reject({ code: 'offline' }),
-      voidOrFind: () => (++calls === 1 ? new Promise(() => {}) : Promise.resolve({ result: 'voided' as const })),
+      voidOrFind: () =>
+        ++calls === 1
+          ? new Promise((_, reject) => setTimeout(() => reject({ code: 'offline' }), 10_000)) // 10秒後に、裏で失敗する
+          : Promise.resolve({ result: 'voided' as const }),
     });
     runner.submit(ctx);
     await flush();
     runner.abandon();
     await vi.advanceTimersByTimeAsync(CONFIRM_TIMEOUT_MS);
-    expect(state().kind).toBe('unverifiable');
-    runner.recheck();
+    expect(state()).toMatchObject({ kind: 'unverifiable', via: 'abandon' });
+    expect(runner.recheck()).toBe('busy'); // 裏の void-or-find が、まだ終わっていない
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(runner.recheck()).toBe('started');
     await flush();
     expect(state()).toEqual({ kind: 'idle', notice: 'voided' });
     expect(calls).toBe(2);
+  });
+
+  describe('pending の保存（#14、order-confirm.md §3）', () => {
+    it('確定の前に保存し、やめるの前に abandoning にして保存し直す。解決したら消す', async () => {
+      const { runner, saved } = setup({ confirmOrder: async () => Promise.reject({ code: 'offline' }), voidOrFind: async () => ({ result: 'voided' }) });
+      runner.submit(ctx);
+      expect(saved).toEqual([{ ctx, abandoning: false }]); // トランザクションを始める前
+      await flush();
+      runner.abandon();
+      expect(saved[1]).toEqual({ ctx, abandoning: true }); // void-or-find を始める前
+      await flush();
+      expect(saved[2]).toBeNull(); // voided → 消す
+    });
+
+    it('成功したら消す。確認できない・決めてもらう（decide）の間は残す', async () => {
+      const a = setup({ confirmOrder: async () => order });
+      a.runner.submit(ctx);
+      await flush();
+      expect(a.saved).toEqual([{ ctx, abandoning: false }, null]);
+
+      const b = setup({ findOrder: async () => null, voidExists: async () => false });
+      b.runner.restore({ ctx, abandoning: false });
+      await flush();
+      expect(b.state()).toEqual({ kind: 'decide', ctx });
+      expect(b.saved).toEqual([]); // 残す
+    });
+  });
+
+  describe('復元（#14、order-confirm.md §5.3、testing.md §4 #17・#19）', () => {
+    it('#17：注文あり → done（登録されていました）', async () => {
+      const { runner, state, saved } = setup({ findOrder: async () => order });
+      expect(runner.restore({ ctx, abandoning: false })).toBe(true);
+      expect(state().kind).toBe('checking');
+      await flush();
+      expect(state()).toMatchObject({ kind: 'done', order, recovered: true });
+      expect(saved).toEqual([null]);
+    });
+
+    it('#19：注文が無く、墓標がある（abandoning なし）→ やめた扱いで idle。「登録されていません」の決めてもらう画面にならない', async () => {
+      const { runner, state } = setup({ findOrder: async () => null, voidExists: async () => true });
+      runner.restore({ ctx, abandoning: false });
+      await flush();
+      expect(state()).toEqual({ kind: 'idle', notice: 'voided' });
+    });
+
+    it('#17：どちらも無い → decide。もう一度確定する（同じ orderId）・やめる', async () => {
+      const confirmOrder = vi.fn(async () => order);
+      const { runner, state } = setup({ confirmOrder, findOrder: async () => null, voidExists: async () => false });
+      runner.restore({ ctx, abandoning: false });
+      await flush();
+      expect(state().kind).toBe('decide');
+      runner.retry();
+      await flush();
+      expect(confirmOrder).toHaveBeenCalledWith(ctx);
+      expect(state()).toMatchObject({ kind: 'done' });
+    });
+
+    it('#17：abandoning → やめる処理の続き（void-or-find）', async () => {
+      const voidOrFind = vi.fn(async () => ({ result: 'voided' as const }));
+      const { runner, state } = setup({ voidOrFind });
+      runner.restore({ ctx, abandoning: true });
+      expect(state().kind).toBe('abandoning');
+      await flush();
+      expect(voidOrFind).toHaveBeenCalledWith('o1');
+      expect(state()).toEqual({ kind: 'idle', notice: 'voided' });
+    });
+
+    it('#17：確認できない（オフライン）→ unverifiable（find）。もう一度確認で、同じ確認をやり直す', async () => {
+      let n = 0;
+      const { runner, state } = setup({ findOrder: async () => (n++ === 0 ? Promise.reject({ code: 'offline' }) : order) });
+      runner.restore({ ctx, abandoning: false });
+      await flush();
+      expect(state()).toMatchObject({ kind: 'unverifiable', via: 'find' });
+      expect(runner.recheck()).toBe('started');
+      await flush();
+      expect(state()).toMatchObject({ kind: 'done', recovered: true });
+    });
+
+    it('墓標を読む権限が無い（メンバーでない）→ decide（やめると、登録できないの知らせになる）', async () => {
+      const { runner, state } = setup({ findOrder: async () => null, voidExists: async () => Promise.reject({ code: 'permission' }) });
+      runner.restore({ ctx, abandoning: false });
+      await flush();
+      expect(state().kind).toBe('decide');
+    });
+
+    it('idle でなければ、復元しない', async () => {
+      const { runner } = setup({});
+      runner.submit(ctx);
+      expect(runner.restore({ ctx: { ...ctx, orderId: 'o2' }, abandoning: false })).toBe(false);
+    });
+  });
+
+  describe('自動の再確認と同時実行（#14、order-confirm.md §5.4、testing.md §4 #27）', () => {
+    it('#27：裏の処理が終わるまで、自動のきっかけ（kick）は何もしない。終わった後の kick で、確かめ直す', async () => {
+      let calls = 0;
+      const { runner, state } = setup({
+        findOrder: () => {
+          calls++;
+          return calls === 1 ? new Promise((_, reject) => setTimeout(() => reject({ code: 'offline' }), 20_000)) : Promise.resolve(order);
+        },
+      });
+      runner.restore({ ctx, abandoning: false });
+      await vi.advanceTimersByTimeAsync(CONFIRM_TIMEOUT_MS);
+      expect(state().kind).toBe('unverifiable');
+      runner.kick(); // 15秒ごと・online のきっかけ
+      runner.kick();
+      expect(calls).toBe(1);
+      expect(runner.busy()).toBe(true);
+      await vi.advanceTimersByTimeAsync(12_000); // 裏の処理が終わる
+      expect(runner.busy()).toBe(false);
+      runner.kick();
+      await flush();
+      expect(calls).toBe(2);
+      expect(state()).toMatchObject({ kind: 'done' });
+    });
+
+    it('unverifiable でなければ、kick は何もしない', () => {
+      const confirmOrder = vi.fn(async () => order);
+      const { runner } = setup({ confirmOrder });
+      runner.kick();
+      expect(confirmOrder).not.toHaveBeenCalled();
+    });
   });
 });
