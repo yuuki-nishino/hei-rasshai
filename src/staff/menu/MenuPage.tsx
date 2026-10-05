@@ -7,10 +7,11 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Empty, ErrorView, Loading } from '../../components/Feedback';
 import { TextField } from '../../components/TextField';
 import { AppError } from '../../lib/data/errors';
-import { addMenuItem, deleteMenuItem, moveMenuItem, updateMenuItem } from '../../lib/data/menu';
+import { addMenuItem, addMenuItemsBulk, deleteMenuItem, moveMenuItem, updateMenuItem } from '../../lib/data/menu';
 import type { MenuItem } from '../../lib/data/types';
 import { MENU_MAX, MENU_NAME_ERROR, MENU_NAME_MAX, parseMenuName, parsePrice, PRICE_ERROR } from '../../lib/domain/menu';
 import { useMenu } from '../../state/menu';
+import { BulkAdd } from './BulkAdd';
 import styles from './MenuPage.module.css';
 
 function messageOf(e: unknown): string {
@@ -24,6 +25,7 @@ export function MenuPage({ eventId }: { eventId: string }) {
   const { items, error: loadError } = useMenu(eventId);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<MenuItem | null>(null);
+  const [bulk, setBulk] = useState(false);
 
   /** 書き込みを待たずに進め、拒否されたら知らせる */
   const send = (p: Promise<void>) => {
@@ -49,6 +51,14 @@ export function MenuPage({ eventId }: { eventId: string }) {
       </div>
 
       <AddForm items={items} onAdd={(input) => send(addMenuItem(eventId, input, items))} />
+
+      {bulk ? (
+        <BulkAdd items={items} onAdd={(lines) => send(addMenuItemsBulk(eventId, lines, items))} onClose={() => setBulk(false)} />
+      ) : (
+        <Button variant="secondary" block disabled={items.length >= MENU_MAX} onClick={() => setBulk(true)}>
+          まとめて追加
+        </Button>
+      )}
 
       {error && (
         <p class={styles.error} role="alert">

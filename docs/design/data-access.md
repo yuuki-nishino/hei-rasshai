@@ -82,7 +82,7 @@ type Unsubscribe = () => void;
 | `updateMenuItem(eventId, id, patch: Partial<Pick<MenuItem, 'name'\|'price'\|'soldOut'>>): Promise<void>` | 検証してから書く（価格は1〜100,000） |
 | `moveMenuItem(eventId, id, dir: 'up' \| 'down', items): Promise<void>` | 並びを入れ替え、**全件の `order` を10, 20, 30…に振り直す**（1バッチ。同じ値になっていても動く）。計算は `reorderMenu`（`lib/domain/menu.ts`）で、値が変わる品だけを書く |
 | `deleteMenuItem(eventId, id): Promise<void>` | 過去の注文は、書き写し済みのため影響なし |
-| `addMenuItemsBulk(eventId, lines: ParsedLine[], items): Promise<void>` | `parseBulkMenu` の結果を、1バッチで追加。合計が100件を超える場合は、`AppError('validation')` |
+| `addMenuItemsBulk(eventId, lines: ParsedLine[], items): Promise<void>` | `parseBulkMenu` の結果を、1バッチで追加（`order` は、今の最大の続きから10ずつ）。合計が100件を超える場合は、`AppError('validation')`（1件も書かない）。各行も、ここで検査する（#11） |
 
 ### 3.5 orders.ts
 | 関数 | 内容 |
@@ -122,7 +122,7 @@ type OrderAction = 'ready' | 'backToPreparing' | 'done' | 'backToReady' | 'cance
 | `toDay(date): Day` | Asia/Tokyoの暦日 |
 | `summarize(orders): Summary` | 売上集計（data-model.md §5.2） |
 | `closingView(summary, closing, eventFloat): ClosingView` | 期待額・差額・「締め後に変更あり」 |
-| `parseBulkMenu(text): { ok: ParsedLine[]; errors: { line: number; reason: string }[] }` | |
+| `parseBulkMenu(text): { ok: ParsedLine[]; errors: { line: number; text: string; reason: string }[] }` | data-model.md §5.6。`ParsedLine` は `{ line, name, price }`。エラー行は、元の文（`text`）と理由。名前の長さ（40文字）も、ここで検査する（#11） |
 | `buildCsv(orders): string` / `csvFileName(eventName, day): string` / `buildSummaryText(...)` | 品名は、注文に書き写し済みのため、メニューの引数は不要 |
 | `calcTotal(lines)` / `calcChange(total, tendered)` | |
 | `nextAction(status)` / `canTransition(from, to)` | 状態遷移 |

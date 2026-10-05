@@ -1,0 +1,97 @@
+.panel {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 2px dashed var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.label {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.hint {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 9em;
+  padding: var(--sp-2) var(--sp-3);
+  border: 2px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--fs-md); /* 16px 未満だと、iPhone が入力時に拡大する */
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.textarea:focus-visible {
+  outline-offset: 0;
+  border-color: var(--color-focus);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.preview {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 3em minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+  align-items: baseline;
+  padding: var(--sp-1) var(--sp-2);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.lineNo {
+  font-size: var(--fs-xs);
+  color: var(--color-ink-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+.name {
+  overflow-wrap: anywhere;
+}
+
+.price {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.errorRow {
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+}
+
+.reason {
+  grid-column: 2 / -1;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.summary {
+  font-weight: 700;
+}
+
+.error {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}

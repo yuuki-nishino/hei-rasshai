@@ -57,3 +57,72 @@ export function reorderMenu(items: readonly MenuOrderItem[], id: string, dir: 'u
   [sorted[i], sorted[j]] = [sorted[j]!, sorted[i]!];
   return sorted.map((x, k) => ({ id: x.id, order: (k + 1) * ORDER_STEP, before: x.order })).filter((x) => x.order !== x.before).map(({ id, order }) => ({ id, order }));
 }
+
+/** まとめて追加の1行（data-model.md §5.6） */
+export interface ParsedLine {
+  /** 行番号（1から） */
+  line: number;
+  name: string;
+  price: number;
+}
+
+export interface BulkMenuResult {
+  ok: ParsedLine[];
+  errors: { line: number; text: string; reason: string }[];
+}
+
+/** 全角の数字・空白（U+3000）・カンマ・コロン・円記号を、半角にそろえる */
+function normalizeBulkLine(s: string): string {
+  return s
+    .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .replace(/\u3000/g, ' ')
+    .replace(/，/g, ',')
+    .replace(/：/g, ':')
+    .replace(/￥/g, '¥');
+}
+
+// 行末の「任意の ¥（後ろに空白があってもよい）＋ 数字 ＋ 任意の 円」を価格、その前を名前とする。区切りは、空白・カンマ・コロン。
+// 数字は、3桁ごとのカンマ（1,000）か、カンマなし（1000）だけ。正規化した文に使う
+const PRICE = String.raw`(?:¥\s*)?(\d{1,3}(?:,\d{3})+|\d+)\s*円?`;
+const BULK_LINE = new RegExp(String.raw`^(.+?)([\s,:]+)${PRICE}$`);
+const PRICE_ONLY = new RegExp(`^${PRICE}$`);
+const PRICE_TAIL = new RegExp(`${PRICE}$`);
+// 行頭の箇条書きの記号（メモからの貼り付け）。- * • は、後ろに空白があるときだけ（「-20%セット」の - は品名。PR #37 の再レビュー B7）。
+// ・は、空白なしで書くことが多いため、いつも除く
+const BULLET = /^(?:[-*•]\s+|・\s*)/;
+
+/**
+ * メニューのまとめて追加（data-model.md §5.6）。1行に「名前 価格」。空行は無視する。
+ * エラー行は、行番号と理由を返す（エラーがある間は、追加しない）。
+ * 正規化（全角 → 半角）は、区切りと価格を見つけるためだけに使い、品名は元の文のまま取り出す（PR #37 のレビュー B3）
+ */
+export function parseBulkMenu(text: string): BulkMenuResult {
+  const result: BulkMenuResult = { ok: [], errors: [] };
+  text.split(/\r\n|\r|\n/).forEach((raw, i) => {
+    const line = i + 1;
+    const t = raw.trim().replace(BULLET, '');
+    if (t === '') return;
+    const s = normalizeBulkLine(t); // 1文字 → 1文字の置き換えなので、t と同じ長さ（位置で、元の文を切り出せる）
+    const err = (reason: string) => result.errors.push({ line, text: raw.trim(), reason });
+    if (PRICE_ONLY.test(s.replace(/^[\s,:]+/, ''))) return err('品名がありません'); // 「,500」も（再レビュー B8）
+    const m = BULK_LINE.exec(s);
+    if (!m) {
+      // 価格の形はあるのに、品名との間に区切りが無い（「焼きそば600円」。レビュー B4）
+      return err(PRICE_TAIL.test(s) ? '品名と価格の間に、空白かカンマを入れてください' : '価格がありません（「品名 価格」の形で書いてください）');
+    }
+    const [, nameNorm, sep, priceText] = m as unknown as [string, string, string, string];
+    // 「ポテト1,500」：3桁区切りのカンマを、区切りと読んでしまう。品名の末尾の数字と価格をつなぐと3桁区切りになるなら、エラー（レビュー B1）
+    if (/^,+$/.test(sep) && !s.slice(nameNorm.length + sep.length).startsWith('¥')) {
+      const tail = /\d{1,3}$/.exec(nameNorm)?.[0];
+      if (tail && /^\d{1,3}(?:,\d{3})+$/.test(`${tail},${priceText}`)) {
+        return err('品名と価格の間に、空白を入れてください（「ポテト1,500」は、品名「ポテト1」500円と読めてしまうため）');
+      }
+    }
+    const name = parseMenuName(t.slice(0, nameNorm.length));
+    const price = Number(priceText.replace(/,/g, ''));
+    if (name === null) err(`品名は${MENU_NAME_MAX}文字までです`);
+    else if (!(price >= PRICE_MIN && price <= PRICE_MAX)) err(`価格は${PRICE_MIN}〜${PRICE_MAX.toLocaleString('ja-JP')}円にしてください`);
+    else result.ok.push({ line, name, price });
+  });
+  return result;
+}
