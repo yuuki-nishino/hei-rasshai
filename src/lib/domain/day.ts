@@ -28,3 +28,10 @@ export function formatDay(day: Day, { year = false } = {}): string {
 export function formatDayRange(start: Day, end: Day): string {
   return start === end ? formatDay(start) : `${formatDay(start)}〜${formatDay(end)}`;
 }
+
+const timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+
+/** 日時（Asia/Tokyo）。'8月1日（土）14:05' */
+export function formatDateTime(date: Date): string {
+  return `${formatDay(toDay(date))}${timeFmt.format(date)}`;
+}

@@ -55,7 +55,7 @@ type Unsubscribe = () => void;
 | `createEvent(input, user): Promise<string>` | **オンライン必須**（[§3.9](#39-オンライン必須の書き込み)）。イベント（`deleting = false`）＋オーナーの `members` を、1バッチで作成。`eventId` を返す。`displayName` は §3.9 の規則 |
 | `updateEvent(eventId, patch): Promise<void>` | 名前・日付・準備金 |
 | `deleteEventDeep(eventId, onProgress): Promise<void>` | **オンライン必須**。配下を削除（[§7](#7-イベント削除)） |
-| `joinEvent(eventId, user): Promise<void>` | **オンライン必須**。すでにメンバーなら何もしない。そうでなければ、メンバー作成＋招待の削除（1バッチ）。最初の確認は、`members/{uid}` の `getDocFromServer`（`permission-denied` は「メンバーではない」と判断する）。`displayName` は §3.9 の規則 |
+| `joinEvent(eventId, user): Promise<'joined' \| 'already'>` | **オンライン必須**。すでにメンバーなら何もしない（`'already'`）。そうでなければ、メンバー作成＋招待の削除（1バッチ）。最初の確認は、`members/{uid}` の `getDocFromServer`（`permission-denied` は「メンバーではない」と判断する。この取得がオンラインの確認を兼ね、8秒で応答がなければ `offline`）。招待が無い・期限切れ・別のアカウント・削除中のイベントは、`permission`。ただし、バッチが `permission` で失敗したときは、`members/{uid}` をもう一度だけサーバーで確かめ、あれば `'already'`（前回の時間切れの送信待ちが、確認の後に先に通った場合。[PR #33 の再レビュー](../reviews/pr-33-invite-join-review.md) J2）。`displayName` は §3.9 の規則 |
 
 **`watchMyEvents` の孤立の掃除（自分の `members` の削除）の条件**（判定は `lib/data/myEvents.ts` の `resolveMyEvents`。Firestore に依存させず、単体テストで全分岐を確かめる。#7）
 - 一覧の表示（キャッシュ可）と、削除の判定（サーバー必須）は、分ける。**判定のための `getDocFromServer` が失敗しても、一覧からは消さない**（キャッシュのイベントを出し続ける）
@@ -69,9 +69,9 @@ type Unsubscribe = () => void;
 | 関数 | 内容 |
 |---|---|
 | `watchMembers(eventId, cb, onError): Unsubscribe` | |
-| `watchInvites(eventId, cb, onError): Unsubscribe` | オーナー用 |
-| `createInvite(eventId, email, uid): Promise<void>` | **オンライン必須**。メールを小文字・前後の空白除去。`createdAt = serverTimestamp`。同じ相手には上書き（再発行＝期限が、その時点から1日） |
-| `cancelInvite(eventId, email): Promise<void>` | |
+| `watchInvites(eventId, cb: (invites: Invite[]) => void, onError): Unsubscribe` | オーナー用。発行の新しい順。`createdAt` は、書き込み直後は見積もりの時刻（`serverTimestamps: 'estimate'`）。期限は `inviteExpiresAt` |
+| `createInvite(eventId, email, uid): Promise<void>` | **オンライン必須**。メールは、画面で `normalizeInviteEmail`（`lib/domain/invite.ts`：前後の空白除去・小文字・形の確認）を通したもの。`createdAt = serverTimestamp`。同じ相手には上書き（再発行＝期限が、その時点から1日） |
+| `cancelInvite(eventId, email): Promise<void>` | **オンライン必須** |
 | `removeMember(eventId, uid): Promise<void>` | オーナー用（他のメンバーのみ）。自分自身の削除（抜ける）にも使う（メンバーのみ。オーナーは不可） |
 
 ### 3.4 menu.ts
@@ -136,7 +136,7 @@ type OrderAction = 'ready' | 'backToPreparing' | 'done' | 'backToReady' | 'cance
 
 - 対象：`createEvent`、`joinEvent`、`createInvite`・`cancelInvite`、`saveClosing`、`deleteEventDeep`、`removeMember`
 - `assertOnline(ref)`（`lib/data/online.ts`）：`getDocFromServer(ref)` を実行する。`unavailable`・タイムアウト（8秒）なら、`AppError('offline')`（「通信が必要です」）を投げて、**書かない**。`permission-denied`・`not-found` は、サーバーに届いた証拠なので、通信ありとして扱う（`createEvent` のように、まだ存在しない文書でも使える）
-- 確認の直後に、通信が切れることは、あり得る。そのときは、書き込みが溜まるが、確認と書き込みの間は短く、頻度が低いため、既知の制約とする。画面は、接続状態（§6）がオフラインの間は、これらの操作のボタンを無効にする。ただし、接続状態の判定は、Shellの購読（イベントを選んでいる間）に依存する。**イベント一覧と `/join` では、`navigator.onLine` だけで判定する**（`assertOnline` があるので、判定が粗くても、書き込みは溜まらない）
+- 確認の直後に、通信が切れることは、あり得る。そのときは、書き込みが溜まるが、確認と書き込みの間は短く、頻度が低いため、既知の制約とする。**書き込みの完了は8秒で打ち切り、`AppError('timeout')`（「送れていません」）にする**（`withTimeout`。打ち切らないと、画面が止まったままになる。[PR #33 のレビュー](../reviews/pr-33-invite-join-review.md) J1）。打ち切っても、送信待ちは端末に残り、つながり直したときに通ることがある。画面は、それを前提に案内する（参加：「もう一度」は、まずメンバーかを確かめるため二重にならない。イベントの作成：押し直すと二重になり得るため、「一覧で確かめてから」。招待：同じ文書の上書きのため、二重にならない）。画面は、接続状態（§6）がオフラインの間は、これらの操作のボタンを無効にする。ただし、接続状態の判定は、Shellの購読（イベントを選んでいる間）に依存する。**イベント一覧と `/join` では、`navigator.onLine` だけで判定する**（`assertOnline` があるので、判定が粗くても、書き込みは溜まらない）
 - 調理画面の操作（`transitionOrder`、`changePayment`）と、メニュー・イベントの編集は、**対象外**（オフラインでも受け付け、`trackWrite` で数える。メニューは、`trackWrite` の対象外）
 
 **`displayName` の決め方**（`createEvent`・`joinEvent`。`lib/domain/event.ts` の `memberDisplayName`）：Googleの表示名（`user.displayName`）を、前後の空白を除いて使う。`null`・空のときは、メールの `@` より前を使う。**60文字を超える場合は、60文字に切り詰める**（ルールが、61文字以上を拒否するため。拒否されると、「招待されていません」と誤った案内になる）。文字数は、ルールと同じく UTF-16 の単位で数え、絵文字の途中では切らない（data-model.md §2 の注）

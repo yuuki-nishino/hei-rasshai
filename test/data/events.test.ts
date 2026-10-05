@@ -14,6 +14,24 @@ vi.mock('../../src/lib/firebase/staff', async () => {
   };
 });
 
+// 確認（getDocFromServer）の直後に通信が切れる場合を作るため、getDocFromServer の後に処理を差し込めるようにする（PR #33 のレビュー J1）
+const hooks = vi.hoisted(() => ({ afterServerRead: null as null | (() => Promise<void>) }));
+vi.mock('firebase/firestore', async (importOriginal) => {
+  const m = await importOriginal<typeof import('firebase/firestore')>();
+  return {
+    ...m,
+    getDocFromServer: async (...args: Parameters<typeof m.getDocFromServer>) => {
+      try {
+        return await m.getDocFromServer(...args);
+      } finally {
+        const hook = hooks.afterServerRead;
+        hooks.afterServerRead = null;
+        if (hook) await hook();
+      }
+    },
+  };
+});
+
 const { createEvent, watchMyEvents } = await import('../../src/lib/data/events');
 const { AppError } = await import('../../src/lib/data/errors');
 type EventDoc = import('../../src/lib/data/types').EventDoc;
@@ -99,6 +117,12 @@ describe('createEvent', () => {
   it('creators でないアカウントは、AppError(permission)', async () => {
     setUser(ALICE);
     await expect(createEvent(input, authUser(ALICE))).rejects.toMatchObject({ code: 'permission' });
+  });
+
+  it('J1：確認の直後に通信が切れると、8秒で timeout になる（止まったままにならない）', async () => {
+    const db = setUser(CREATOR);
+    hooks.afterServerRead = () => disableNetwork(db);
+    await expect(createEvent(input, authUser(CREATOR))).rejects.toMatchObject({ code: 'timeout' });
   });
 
   it('オフラインなら、AppError(offline)。書き込みは溜まらない（復帰しても作られない）', async () => {

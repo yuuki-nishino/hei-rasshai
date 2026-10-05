@@ -16,6 +16,10 @@ import styles from './CreateEventPage.module.css';
 function messageOf(e: unknown): string {
   if (e instanceof AppError && e.code === 'permission') return 'イベントの作成は、許可されたアカウントのみです';
   if (e instanceof AppError && e.code === 'offline') return '通信が必要です。電波を確認してから、もう一度押してください';
+  // 時間切れ：送信待ちが残り、あとで作成されることがある。押し直すと二重になり得る（PR #33 のレビュー J1）
+  if (e instanceof AppError && e.code === 'timeout') {
+    return '送れていません。通信が戻ると、作成されることがあります。もう一度作成する前に、一覧で確かめてください';
+  }
   return 'イベントを作成できませんでした。時間をおいて、もう一度押してください';
 }
 

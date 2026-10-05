@@ -1,0 +1,87 @@
+.panel {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.h2 {
+  font-family: var(--font-hand);
+  font-size: var(--fs-xl);
+  font-weight: 400;
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+.form {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.link {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-md);
+  background: var(--color-nature-bg);
+}
+
+.linkLabel {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.url {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.copied {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--status-ready-fg);
+}
+
+.list {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invite {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.email {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.expires {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+}
+
+.expired {
+  color: var(--status-void-fg);
+  font-weight: 700;
+}
+
+.error {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}

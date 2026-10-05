@@ -1,0 +1,7 @@
+.main {
+  display: grid;
+  gap: var(--sp-6);
+  max-width: 640px;
+  margin-inline: auto;
+  padding: var(--sp-4) var(--sp-4) calc(var(--sp-10) + env(safe-area-inset-bottom, 0px));
+}
