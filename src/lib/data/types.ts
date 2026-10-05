@@ -18,6 +18,9 @@ export interface Member {
   email: string;
 }
 
+export type Payment = 'cash' | 'paypay';
+export type OrderStatus = 'preparing' | 'ready' | 'done' | 'cancelled';
+
 export interface MenuItem {
   id: string;
   name: string;

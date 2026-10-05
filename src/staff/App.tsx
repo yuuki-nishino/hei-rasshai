@@ -1,7 +1,6 @@
 // スタッフ画面のルート。Shell は、後のIssueで足す（screens.md §1.2）
 import { Button } from '../components/Button';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { Empty } from '../components/Feedback';
 import { Noren } from '../components/Noren';
 import { blurActiveInput } from '../components/blurActiveInput';
 import { tabId, Tabs } from '../components/Tabs';
@@ -18,6 +17,7 @@ import { AuthGate } from './auth/AuthGate';
 import { EventGate } from './event/EventGate';
 import { JoinPage } from './join/JoinPage';
 import { MenuPage } from './menu/MenuPage';
+import { OrderPage } from './order/OrderPage';
 import { InvitePanel } from './members/InvitePanel';
 import { MembersPanel } from './members/MembersPanel';
 
@@ -54,7 +54,7 @@ function EventHome() {
       <Tabs tabs={TABS} selected={tab} onSelect={selectTab} label="画面の切り替え" panelId="tab-panel" />
       <main>
         <div class={styles.main} id="tab-panel" role="tabpanel" aria-labelledby={tabId(tab)}>
-          {tab === 'order' && <Empty title="注文の画面（準備中）" />}
+          {tab === 'order' && eventId && <OrderPage eventId={eventId} />}
           {tab === 'menu' && eventId && <MenuPage eventId={eventId} />}
           {tab === 'event' && (
             <>

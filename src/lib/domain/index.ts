@@ -5,3 +5,4 @@ export * from './event';
 export * from './invite';
 export * from './cacheClear';
 export * from './menu';
+export * from './order';

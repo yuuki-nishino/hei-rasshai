@@ -1,0 +1,358 @@
+.page {
+  display: grid;
+  gap: var(--sp-5);
+  /* 下に固定した合計・確定の帯の分、余白を空ける */
+  padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+}
+
+.h2 {
+  font-family: var(--font-hand);
+  font-size: var(--fs-xl);
+  font-weight: 400;
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+/* メニュー：タップで追加。スマホは2列、広い画面は3列以上 */
+.menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--sp-2);
+}
+
+.menuItem {
+  position: relative;
+  display: grid;
+  align-content: space-between;
+  gap: var(--sp-1);
+  min-height: 76px;
+  padding: var(--sp-3);
+  border: 2px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--dur) ease;
+  touch-action: manipulation;
+}
+
+.menuItem:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.menuItem.inCart {
+  border-color: var(--color-brand);
+}
+
+.menuItem:disabled {
+  background: var(--color-bg);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.menuName {
+  font-family: var(--font-hand);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+  overflow-wrap: anywhere;
+}
+
+.menuPrice {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+.qtyBadge {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.soldOutLabel {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--status-void-fg);
+}
+
+/* カート */
+.cart {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+}
+
+.cartHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.lines {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-1) var(--sp-2);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px dashed var(--color-line);
+}
+
+.lineName {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.lineSub {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+.lineAmount {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.step {
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border: 2px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.qty {
+  min-width: 2.2em;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.remove {
+  margin-left: auto;
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-3);
+  border: none;
+  background: transparent;
+  color: var(--status-void-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notice {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--status-cooking-bg);
+  color: var(--status-cooking-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.noticeButton {
+  min-height: 36px;
+  padding: 0 var(--sp-3);
+  border: 2px solid currentColor;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 支払い・お預り・QR */
+.options {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.group {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.label {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.segment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+
+.segButton {
+  min-height: var(--tap-big);
+  border: 2px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink-sub);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.segButton.cash[aria-pressed='true'] {
+  border-color: var(--pay-cash-fg);
+  background: var(--pay-cash-bg);
+  color: var(--pay-cash-fg);
+}
+
+.segButton.paypay[aria-pressed='true'] {
+  border-color: var(--pay-paypay-bg);
+  background: var(--pay-paypay-bg);
+  color: var(--pay-paypay-fg);
+}
+
+.tendered {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.tenderedInput {
+  min-height: var(--tap-big);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 2px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--fs-xl);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tenderedInput:focus-visible {
+  outline-offset: 0;
+  border-color: var(--color-focus);
+}
+
+.quick {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-2);
+}
+
+.quickButton {
+  min-height: var(--tap-min);
+  border: 2px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.change {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.short {
+  color: var(--status-void-fg);
+}
+
+.qrToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--tap-min);
+  cursor: pointer;
+}
+
+.qrToggle input {
+  width: 28px;
+  height: 28px;
+  accent-color: var(--color-brand);
+}
+
+.error {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* 下に固定：合計と確定 */
+.footer {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 5;
+  padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--color-surface);
+  border-top: 2px solid var(--color-line);
+  box-shadow: 0 -4px 16px rgb(60 40 20 / 0.08);
+}
+
+.footerInner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-3);
+  align-items: center;
+  max-width: 640px;
+  margin-inline: auto;
+}
+
+.total {
+  display: grid;
+  line-height: 1.1;
+}
+
+.totalLabel {
+  font-size: var(--fs-xs);
+  color: var(--color-ink-sub);
+}
+
+.totalValue {
+  font-size: var(--fs-2xl);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
