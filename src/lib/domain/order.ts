@@ -1,7 +1,10 @@
 // 注文のカートと金額（screens.md §3.4、data-model.md §2.6）
+import { PRICE_MAX } from './menu';
+
 export const ORDER_LINES_MAX = 50; // 1注文の行数（ルールと同じ）
 export const QTY_MAX = 99; // 1行の数量（data-model.md §2.6）
-export const TENDERED_MAX = 1_000_000; // お預りの上限（入力の打ち間違いを防ぐ）
+/** お預りの上限：ありうる合計の最大（100,000円 × 99個 × 50品）。「ちょうど」が、どの合計でも入るように（PR #38 のレビュー C1） */
+export const TENDERED_MAX = PRICE_MAX * QTY_MAX * ORDER_LINES_MAX;
 
 /** カートの1行。カートに入れた時点の名前・価格を持つ（保存する items と同じ形） */
 export interface CartLine {

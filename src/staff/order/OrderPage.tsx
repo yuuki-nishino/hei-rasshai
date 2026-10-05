@@ -4,7 +4,7 @@ import { useState } from 'preact/hooks';
 import { Button } from '../../components/Button';
 import { Empty, ErrorView, Loading } from '../../components/Feedback';
 import type { MenuItem } from '../../lib/data/types';
-import { calcChange, formatYen, lineNotice, parseTendered, type CartLine } from '../../lib/domain/order';
+import { calcChange, formatYen, lineNotice, parseTendered, QTY_MAX, type CartLine } from '../../lib/domain/order';
 import {
   addItemToCart,
   applyLineCurrentPrice,
@@ -121,6 +121,8 @@ function Cart({ lines, menu }: { lines: CartLine[]; menu: MenuItem[] }) {
         <ul class={styles.lines}>
           {lines.map((l) => {
             const n = lineNotice(l, menu);
+            // 売り切れ・削除された行は、減らす・消すだけ。99個で止める（PR #38 のレビュー C2・C3）
+            const canIncrease = !n.soldOut && !n.deleted && l.qty < QTY_MAX;
             return (
               <li key={l.menuId} class={styles.line}>
                 <div>
@@ -137,7 +139,13 @@ function Cart({ lines, menu }: { lines: CartLine[]; menu: MenuItem[] }) {
                   <span class={styles.qty} aria-label={`数量 ${l.qty}`}>
                     {l.qty}
                   </span>
-                  <button type="button" class={styles.step} aria-label={`${l.name}を1つ増やす`} onClick={() => changeLineQty(l.menuId, 1)}>
+                  <button
+                    type="button"
+                    class={styles.step}
+                    aria-label={`${l.name}を1つ増やす`}
+                    disabled={!canIncrease}
+                    onClick={() => changeLineQty(l.menuId, 1)}
+                  >
                     ＋
                   </button>
                   <button type="button" class={styles.remove} onClick={() => removeCartLine(l.menuId)}>

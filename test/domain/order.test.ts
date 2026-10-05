@@ -10,6 +10,7 @@ import {
   lineNotice,
   parseTendered,
   removeLine,
+  TENDERED_MAX,
   type CartLine,
 } from '../../src/lib/domain';
 
@@ -95,9 +96,14 @@ describe('parseTendered / formatYen', () => {
     ['1000', 1000],
     ['１０，０００円', 10000],
     ['¥5,000', 5000],
-    ['1000000', 1000000],
+    ['1100000', 1100000],
   ])('%s → %d', (s, v) => expect(parseTendered(s)).toBe(v));
-  it.each(['-1', '1.5', 'abc', '1,00', '1000001'])('%s は拒否', (s) => expect(parseTendered(s)).toBeNull());
+  it.each(['-1', '1.5', 'abc', '1,00'])('%s は拒否', (s) => expect(parseTendered(s)).toBeNull());
+  it('上限は、ありうる合計の最大（100,000円 × 99個 × 50品）。「ちょうど」が、どの合計でも入る（レビュー C1）', () => {
+    expect(TENDERED_MAX).toBe(495_000_000);
+    expect(parseTendered(String(TENDERED_MAX))).toBe(TENDERED_MAX);
+    expect(parseTendered(String(TENDERED_MAX + 1))).toBeNull();
+  });
   it('¥1,200', () => {
     expect(formatYen(1200)).toBe('¥1,200');
   });
