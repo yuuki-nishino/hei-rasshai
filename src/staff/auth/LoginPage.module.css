@@ -1,0 +1,38 @@
+.page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-8) var(--sp-4) calc(var(--sp-8) + env(safe-area-inset-bottom, 0px));
+}
+
+.panel {
+  width: min(100%, 360px);
+  display: grid;
+  gap: var(--sp-8);
+}
+
+.tagline {
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+}
+
+.actions {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.error {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.note {
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--color-ink-sub);
+}

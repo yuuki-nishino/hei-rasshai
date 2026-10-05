@@ -1,0 +1,40 @@
+.box {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-10) var(--sp-4);
+  text-align: center;
+  color: var(--color-ink-sub);
+}
+
+.title {
+  font-family: var(--font-hand);
+  font-size: var(--fs-lg);
+  color: var(--color-ink);
+}
+
+.error .title {
+  color: var(--status-void-fg);
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-line);
+  border-top-color: var(--color-brand);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-color: var(--color-brand);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}

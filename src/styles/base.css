@@ -1,0 +1,81 @@
+/* 全体の土台（スタッフ・お客様の共通）。tokens.css の後に読み込む */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sys);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  line-height: var(--lh-tight);
+  text-wrap: balance;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* 手書きの文字（見出し・ボタン・番号）。.hand-bold は、縁取りで太く見せる */
+.hand {
+  font-family: var(--font-hand);
+  font-weight: 400;
+}
+
+.hand-bold {
+  font-family: var(--font-hand);
+  font-weight: 400;
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

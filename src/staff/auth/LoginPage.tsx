@@ -2,6 +2,9 @@
 import { useState } from 'preact/hooks';
 import { AppError } from '../../lib/data/errors';
 import { signInWithGoogle } from '../../lib/data/auth';
+import { Button } from '../../components/Button';
+import { Logo } from '../../components/Logo';
+import styles from './LoginPage.module.css';
 
 function messageOf(e: unknown): string {
   if (e instanceof AppError && e.code === 'offline') return '通信できません。電波を確認してください';
@@ -27,13 +30,22 @@ export function LoginPage() {
   }
 
   return (
-    <main>
-      <h1>毎度おおきに</h1>
-      <p>イベントの注文受付・呼び出し・売上管理</p>
-      <button type="button" onClick={login}>
-        Googleでログイン
-      </button>
-      {error && <p role="alert">{error}</p>}
+    <main class={styles.page}>
+      <div class={styles.panel}>
+        <Logo />
+        <p class={styles.tagline}>注文の受付・呼び出し・売上を、スマホひとつで</p>
+        <div class={styles.actions}>
+          <Button variant="primary" big block onClick={login}>
+            Googleでログイン
+          </Button>
+          {error && (
+            <p class={styles.error} role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+        <p class={styles.note}>スタッフ用の画面です</p>
+      </div>
     </main>
   );
 }

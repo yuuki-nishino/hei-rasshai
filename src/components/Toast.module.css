@@ -1,0 +1,54 @@
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-md);
+  background: var(--color-ink);
+  color: var(--color-surface);
+  box-shadow: var(--shadow-float);
+  animation: rise var(--dur) ease-out;
+}
+
+.message {
+  flex: 1;
+  min-width: 0;
+  padding-block: 6px;
+}
+
+/* 失敗は、地を赤にして、閉じるまで残す（screens.md §2） */
+.error {
+  background: var(--status-void-fg);
+}
+
+.close {
+  flex: none;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 画面の下に重ねる置き場所 */
+.region {
+  position: fixed;
+  inset-inline: var(--sp-4);
+  bottom: calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  display: grid;
+  gap: var(--sp-2);
+  max-width: 480px;
+  margin-inline: auto;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}

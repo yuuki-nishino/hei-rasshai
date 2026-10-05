@@ -1,0 +1,32 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 32px;
+  padding: var(--sp-1) var(--sp-4);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.bar::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.online {
+  background: var(--status-ready-bg);
+  color: var(--status-ready-fg);
+}
+
+.offline {
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+}
+
+.pending {
+  background: var(--status-cooking-bg);
+  color: var(--status-cooking-fg);
+}

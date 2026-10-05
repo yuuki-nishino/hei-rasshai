@@ -16,6 +16,7 @@
 | [data-access.md](./design/data-access.md) | API設計。データアクセス層の関数・型・エラー・購読 |
 | [order-confirm.md](./design/order-confirm.md) | 注文確定フロー |
 | [screens.md](./design/screens.md) | 画面設計 |
+| [visual.md](./design/visual.md) | 見た目の設計（色・文字・共通部品） |
 | [testing.md](./design/testing.md) | テスト計画 |
 
 ## 書き分けの方針
