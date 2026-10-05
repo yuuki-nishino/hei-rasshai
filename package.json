@@ -13,12 +13,13 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "eslint .",
-    "test": "npm run test:unit && npm run test:rules",
+    "test": "npm run test:unit && npm run test:rules && npm run test:data",
     "test:watch": "vitest --project unit",
     "emulators": "firebase emulators:start --project demo-maido-ookini",
     "build:dev": "tsc -b && node scripts/build.mjs development",
     "test:unit": "vitest run --project unit",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-maido-ookini \"vitest run --project rules\""
+    "test:rules": "firebase emulators:exec --only firestore --project demo-maido-ookini \"vitest run --project rules\"",
+    "test:data": "firebase emulators:exec --only firestore --project demo-maido-ookini \"vitest run --project data\""
   },
   "dependencies": {
     "@fontsource/zen-kurenaido": "^5.3.0",

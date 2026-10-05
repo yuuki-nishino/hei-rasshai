@@ -1,0 +1,85 @@
+.main {
+  display: grid;
+  gap: var(--sp-4);
+  max-width: 640px;
+  margin-inline: auto;
+  padding: var(--sp-4) var(--sp-4) calc(var(--sp-10) + env(safe-area-inset-bottom, 0px));
+}
+
+.list {
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* カード全体を押せるボタンにする */
+.item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: var(--tap-big);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur) ease;
+}
+
+.item:active {
+  background: var(--color-bg);
+}
+
+.name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-hand);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+  overflow-wrap: anywhere;
+}
+
+.dates {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+}
+
+.deleting {
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+  font-family: var(--font-sys);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  -webkit-text-stroke: 0;
+}
+
+.notice {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--status-cooking-bg);
+  color: var(--status-cooking-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.create {
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.hint {
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+}

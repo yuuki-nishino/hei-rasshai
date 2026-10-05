@@ -24,6 +24,28 @@ function codeOf(e: unknown): string | undefined {
   return typeof e === 'object' && e !== null && 'code' in e && typeof e.code === 'string' ? e.code : undefined;
 }
 
+// Firestore のエラーを AppError に変換する（data-access.md §4）。AppError は、そのまま返す
+export function toAppError(e: unknown): AppError {
+  if (e instanceof AppError) return e;
+  switch (codeOf(e)) {
+    case 'unavailable':
+      return new AppError('offline', { cause: e });
+    case 'deadline-exceeded':
+      return new AppError('timeout', { cause: e });
+    case 'permission-denied':
+      return new AppError('permission', { cause: e });
+    case 'not-found':
+      return new AppError('not-found', { cause: e });
+    case 'aborted':
+    case 'failed-precondition':
+      return new AppError('conflict', { cause: e });
+    case 'invalid-argument':
+      return new AppError('validation', { cause: e });
+    default:
+      return new AppError('unknown', { cause: e });
+  }
+}
+
 // ログインの失敗の分類（screens.md §3.1）。'cancelled' は、本人が閉じた・取り消した（何も表示しない）
 export function classifyAuthError(e: unknown): 'cancelled' | AppError {
   switch (codeOf(e)) {

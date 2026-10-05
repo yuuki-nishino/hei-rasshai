@@ -47,6 +47,11 @@ export default defineConfig({
         extends: true,
         test: { name: 'rules', include: ['test/rules/**/*.test.ts'], fileParallelism: false, testTimeout: 20000, hookTimeout: 20000 },
       },
+      // データアクセスの結合テスト（Firestore Emulator が必要。npm run test:data）
+      {
+        extends: true,
+        test: { name: 'data', include: ['test/data/**/*.test.ts'], fileParallelism: false, testTimeout: 30000, hookTimeout: 20000 },
+      },
     ],
   },
 });

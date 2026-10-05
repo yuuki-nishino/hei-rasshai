@@ -41,5 +41,7 @@ jobs:
         run: npm run test:unit
       - name: ルールのテスト（Firestore Emulator）
         run: npm run test:rules
+      - name: データアクセスの結合テスト（Firestore Emulator）
+        run: npm run test:data
       - name: ビルド
         run: npm run build
