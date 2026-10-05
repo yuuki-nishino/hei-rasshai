@@ -48,8 +48,10 @@
 }
 
 .numberUnit {
-  font-size: var(--fs-xl);
   margin-left: 4px;
+  font-size: var(--fs-2xl);
+  /* 縁取りの太さは、親（番号）の em で決まると、小さな「番」には太すぎて潰れる。「番」の大きさに合わせ直す */
+  -webkit-text-stroke-width: var(--hand-bold);
 }
 
 .amounts {

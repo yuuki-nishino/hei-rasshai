@@ -63,3 +63,44 @@
 **直し方の案**：
 - `runAbandon` で、`permission` を「通信できない」と分ける。注文は登録されていない（確定も断られている）ので、「登録されていません」と知らせて `idle` に戻す。たとえば reducer に、`abandoning` → `idle`（新しい notice）のイベントを足す
 - `confirmRunner.test.ts` に「`voidOrFind` が `permission` で失敗 → `idle`」を足す。order-confirm.md §6 の失敗の扱いも合わせる
+
+## 再レビュー（対応の確認）
+
+- 日付：2026-10-05
+- 対象：`1769f07`（fix: PR #39 のレビュー（C1〜C3）に対応）。CI は通っている
+
+### 結論
+
+**C1〜C3 は解決した。** 新しい指摘は、🟡 が1件（R1）と、ℹ️ が1件（R2）。どちらも小さな直しで、マージを止めるものではない。R1 は、この PR で直すことを勧める。
+
+| # | 結果 | 内容 |
+|---|---|---|
+| C1 | ✅ 解決 | reducer の `dismiss`（`failed`・`voided` → `idle`）を「確定せずに戻る」が使う。`failed`・`voided` からの `abandon` は受け付けない。`voidOrFind` を呼ばないことを、runner のテストで確かめている |
+| C2 | ✅ 解決 | `voidExists` を、確定を始めてから8秒までの残りの時間で打ち切る。時間切れ・失敗を、案の `permission` ではなく `timeout` にしたのは、より良い（墓標の有無が分からないのに「権限がありません」と言い切らず、同じ `orderId` の「もう一度試す」「やめる」で、安全に確かめられる）。偽のタイマーで、7.999秒は `submitting`・8秒で `failed` を確かめている |
+| C3 | ✅ 解決（R1 あり） | `runAbandon` で `permission` を `blocked`（`idle`＋知らせ）に分けた。カートは残り、ダイアログから抜けられる |
+| R1 | 🟡 低 | `voidOrFind` の代わりの読み取りが失敗したときも `permission` になり、`blocked`（「前の注文は、登録されていません」）と言い切ってしまう |
+| R2 | ℹ️ 情報 | 「確定も断られているので、登録されていない」という理由づけが正しくない（もとのレビューの案の書き方の誤り） |
+
+### R1 🟡 代わりの読み取りが失敗しても、「登録されていません」と言い切る
+
+**場所**：`src/lib/data/orders.ts:151`（`getDocFromServer(orderRef).catch(() => null)`）、`src/state/confirmRunner.ts:77`
+
+**問題**：
+- `voidOrFind` は、トランザクションが `permission` で断られたとき、`getDocFromServer(orderRef)` で注文を探す。この読み取りが**失敗**しても `null` にして、もとの `permission` を投げ直す
+- C3 の対応で、`permission` は `blocked`（「前の注文は、登録されていません」）と言い切るようになった。そのため、「注文が無いと確かめた」と「確かめられなかった」が、同じ表示になる
+
+**起こりうること**：確定が時間切れ（`timeout`）になる。裏でトランザクションは登録まで進んでいた。そのあとメンバーから外され、「やめる」を押す。トランザクションは `permission`、直後の読み取りは回線が切れて失敗。画面は「前の注文は、登録されていません」と出るが、実際には登録されている。（起きる幅は狭い）
+
+**直し方の案**：
+- 代わりの読み取りが失敗したときは、`permission` ではなく、その失敗（`offline` など）を投げる。runner はそれを `unverifiable` にする。たとえば `.catch(() => null)` をやめ、`catch` の中で `toAppError` して投げる
+- 結合テスト（`test/data/orders.test.ts`）か runner のテストで、「代わりの読み取りの失敗 → `unverifiable`」を確かめる
+
+### R2 ℹ️ 「登録されていない」の理由づけ
+
+**場所**：`src/lib/domain/confirmFlow.ts`（`blocked` のコメント）、`src/state/confirmRunner.ts:75`、order-confirm.md §4
+
+**問題**：
+- 「確定も断られているので、注文は登録されていない」と書いているが、「やめる」は `permission` 以外の失敗（`timeout`・`offline`・`conflict`）からも押せる。時間切れのときは、登録されていることがある
+- 正しい根拠は、「注文は誰でも1件読める（`orders` の `get: if true`）ので、`voidOrFind` の代わりの読み取りで、サーバーに注文が無いことを確かめた」こと。もとのレビュー（C3 の直し方の案）の書き方が誤っていた
+
+**直し方の案**：コメントと order-confirm.md §4 の理由を、上の根拠に書き換える（R1 を直すと、この根拠が成り立つ）。

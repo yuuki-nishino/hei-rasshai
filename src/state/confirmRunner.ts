@@ -72,8 +72,9 @@ export function createConfirmRunner(deps: ConfirmDeps, store: { get(): ConfirmSt
       else dispatch({ type: 'voided' });
     } catch (e) {
       if (!still('abandoning', ctx.orderId)) return;
-      // 権限で断られた（メンバーでない・イベントの削除中）：通信の問題ではない。注文も登録されていない（確定も断られている）。
-      // 「確認できない」にすると、何度確かめても抜けられないため、知らせて戻す（PR #39 のレビュー C3）
+      // 権限で断られた（メンバーでない・イベントの削除中）：通信の問題ではない。注文も登録されていない
+      // （voidOrFind が、サーバーで注文が無いと確かめたときだけ permission を投げる。確かめられなければ、その失敗＝確認できない）。
+      // 「確認できない」にすると、何度確かめても抜けられないため、知らせて戻す（PR #39 のレビュー C3・再レビュー R1・R2）
       if (codeOf(e) === 'permission') dispatch({ type: 'blocked' });
       // 通信できない・そのほかの失敗：確認できない（墓標が遅れて書かれても、意図した結果なので問題ない）
       else dispatch({ type: 'unverifiable' });

@@ -160,6 +160,21 @@ describe('voidOrFind', () => {
   });
 });
 
+describe('voidOrFind：メンバーでない（PR #39 のレビュー C3・再レビュー R1）', () => {
+  it('注文が無ければ permission（サーバーで無いと確かめた上で、墓標を作れない）', async () => {
+    setUser('stranger');
+    await expect(voidOrFind('e1', newOrderId('e1'), 'stranger')).rejects.toMatchObject({ code: 'permission' });
+  });
+
+  it('注文があれば found（注文は誰でも1件読めるため、メンバーでなくても確かめられる）', async () => {
+    setUser(ALICE);
+    const id = newOrderId('e1');
+    await confirmOrder('e1', ctxOf(id), ALICE);
+    setUser('stranger');
+    expect(await voidOrFind('e1', id, 'stranger')).toMatchObject({ result: 'found', order: { id, number: 1 } });
+  });
+});
+
 describe('findOrderOnServer', () => {
   it('#8：存在すれば注文、なければ null', async () => {
     setUser(ALICE);

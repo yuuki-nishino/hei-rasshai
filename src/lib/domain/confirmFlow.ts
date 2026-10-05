@@ -53,7 +53,7 @@ export type ConfirmEvent =
   | { type: 'abandon' }
   /** やめた扱いと分かっている注文（failed・voided）を、問い合わせずに閉じる。カートは残す（PR #39 のレビュー C1） */
   | { type: 'dismiss' }
-  /** やめる処理が、権限で断られた（メンバーでない・削除中）。注文は登録されていない（確定も断られている） */
+  /** やめる処理が、権限で断られた（メンバーでない・削除中）。注文は登録されていない（注文は誰でも1件読めるので、voidOrFind がサーバーで無いと確かめた。PR #39 の再レビュー R2） */
   | { type: 'blocked' }
   /** void-or-find の結果 */
   | { type: 'found'; order: ConfirmedOrder }

@@ -132,7 +132,8 @@ async function confirmOnce(eventId: string, ctx: ConfirmContext, uid: string): P
 
 /**
  * やめる（void-or-find。order-confirm.md §5.2）。注文があれば返し（成功扱い）、なければ墓標を作る。
- * 直前に注文が登録された競合（ルールが墓標を拒否）は、注文を読み直して found にする
+ * 直前に注文が登録された競合（ルールが墓標を拒否）は、注文を読み直して found にする。
+ * permission を投げるのは、サーバーで注文が無いと確かめたうえで、墓標を作る権限が無いとき（メンバーでない・削除中）だけ
  */
 export async function voidOrFind(eventId: string, orderId: string, uid: string): Promise<{ result: 'found'; order: Order } | { result: 'voided' }> {
   const orderRef = doc(ordersCol(eventId), orderId);
@@ -148,10 +149,18 @@ export async function voidOrFind(eventId: string, orderId: string, uid: string):
   } catch (e) {
     const err = toAppError(e);
     if (err.code === 'permission') {
-      const o = await getDocFromServer(orderRef).catch(() => null);
-      if (o?.exists()) return { result: 'found', order: toOrder(o) };
+      // 注文は、誰でも1件読める（ルールの orders の get: if true）。メンバーでなくても、サーバーで注文の有無を確かめられる。
+      // 確かめられなかった（通信の失敗など）ときは、その失敗を投げる（permission のままだと「登録されていません」と言い切ってしまう。
+      // PR #39 の再レビュー R1）
+      let o;
+      try {
+        o = await getDocFromServer(orderRef);
+      } catch (readError) {
+        throw toAppError(readError);
+      }
+      if (o.exists()) return { result: 'found', order: toOrder(o) };
     }
-    throw err;
+    throw err; // permission：サーバーで、注文が無いと確かめた（墓標は、権限で作れない）
   }
 }
 
