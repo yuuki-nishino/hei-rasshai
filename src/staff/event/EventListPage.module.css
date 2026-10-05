@@ -6,6 +6,25 @@
   padding: var(--sp-4) var(--sp-4) calc(var(--sp-10) + env(safe-area-inset-bottom, 0px));
 }
 
+.heading {
+  display: grid;
+  gap: 2px;
+}
+
+.title {
+  font-family: var(--font-hand);
+  font-size: var(--fs-xl);
+  font-weight: 400;
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+.account {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+  overflow-wrap: anywhere;
+}
+
 .list {
   display: grid;
   gap: var(--sp-3);

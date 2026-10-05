@@ -21,9 +21,10 @@ export function EventListPage() {
 
   return (
     <>
+      {/* 一覧はアプリの入口なので、のれんにはアプリ名を掲げる（イベントの中では、イベント名。visual.md §4） */}
       <Noren
-        title="イベント"
-        sub={currentUser.value?.email ?? undefined}
+        title="毎度おおきに"
+        sub="イベント注文アプリ"
         actions={
           <Button variant="secondary" onClick={() => void logout()}>
             ログアウト
@@ -31,6 +32,10 @@ export function EventListPage() {
         }
       />
       <main class={styles.main}>
+        <div class={styles.heading}>
+          <h2 class={styles.title}>イベント</h2>
+          {currentUser.value?.email && <p class={styles.account}>{currentUser.value.email} でログイン中</p>}
+        </div>
         {!online && <p class={styles.notice}>オフラインです。端末に保存してあるイベントだけを表示しています</p>}
         <EventList />
         {data && (
