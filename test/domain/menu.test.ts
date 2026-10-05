@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextMenuOrder, parseMenuName, parsePrice, reorderMenu, sortMenu } from '../../src/lib/domain';
+import { nextMenuOrder, parseBulkMenu, parseMenuName, parsePrice, reorderMenu, sortMenu } from '../../src/lib/domain';
 
 describe('parseMenuName', () => {
   it('前後の空白を除き、1〜40文字（絵文字は2文字）', () => {
@@ -68,5 +68,51 @@ describe('reorderMenu', () => {
       { id: 'c', order: 20 },
       { id: 'b', order: 30 },
     ]);
+  });
+});
+
+describe('parseBulkMenu（data-model.md §5.6、testing.md §2）', () => {
+  it('例：空白・カンマ・全角の空白と数字・「円」→ 3件', () => {
+    expect(parseBulkMenu('たこ焼き 500\nラムネ,200\n焼きそば\u3000６００円')).toEqual({
+      ok: [
+        { line: 1, name: 'たこ焼き', price: 500 },
+        { line: 2, name: 'ラムネ', price: 200 },
+        { line: 3, name: '焼きそば', price: 600 },
+      ],
+      errors: [],
+    });
+  });
+
+  it.each([
+    ['コロン', 'かき氷:300', 'かき氷', 300],
+    ['全角のコロン', 'かき氷：300', 'かき氷', 300],
+    ['タブ', 'かき氷\t300', 'かき氷', 300],
+    ['¥ 付き', 'かき氷 ¥300', 'かき氷', 300],
+    ['￥ 付き', 'かき氷 ￥３００', 'かき氷', 300],
+    ['全角のカンマ', 'かき氷，300', 'かき氷', 300],
+    ['3桁区切り', 'ビール 1,000', 'ビール', 1000],
+    ['全角の3桁区切り', 'ビール\u3000１，０００円', 'ビール', 1000],
+    ['区切りが連続', 'ビール ,  500', 'ビール', 500],
+    ['名前に空白', 'たこ焼き 8個入り 600', 'たこ焼き 8個入り', 600],
+    ['前後の空白', '  ラムネ 200  ', 'ラムネ', 200],
+  ])('%s', (_label, text, name, price) => {
+    expect(parseBulkMenu(text)).toEqual({ ok: [{ line: 1, name, price }], errors: [] });
+  });
+
+  it('空行は無視し、行番号は元の行で数える（CRLF も可）', () => {
+    expect(parseBulkMenu('\r\nたこ焼き 500\r\n\r\n  \r\nラムネ 200').ok.map((l) => l.line)).toEqual([2, 5]);
+  });
+
+  it.each([
+    ['価格なし', 'たこ焼き', '価格がありません'],
+    ['名前なし', '500円', '品名がありません'],
+    ['価格が0', 'たこ焼き 0', '価格は1〜100,000円'],
+    ['価格が範囲外', 'たこ焼き 100001', '価格は1〜100,000円'],
+    ['1,0,0（末尾の0だけが価格になり、範囲外）', '焼き 1,0,0', '価格は1〜100,000円'],
+    ['名前が41文字', `${'あ'.repeat(41)} 500`, '品名は40文字まで'],
+  ])('エラー行：%s', (_label, text, reason) => {
+    const r = parseBulkMenu(`ラムネ 200\n${text}`);
+    expect(r.ok).toHaveLength(1);
+    expect(r.errors).toEqual([{ line: 2, text, reason: expect.stringContaining(reason) }]);
   });
 });

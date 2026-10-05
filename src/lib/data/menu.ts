@@ -6,12 +6,14 @@ import {
   MENU_MAX,
   MENU_NAME_ERROR,
   nextMenuOrder,
+  ORDER_STEP,
   parseMenuName,
   PRICE_ERROR,
   PRICE_MAX,
   PRICE_MIN,
   reorderMenu,
   sortMenu,
+  type ParsedLine,
 } from '../domain/menu';
 import { db } from '../firebase/staff';
 import { AppError, toAppError } from './errors';
@@ -70,6 +72,25 @@ export function addMenuItem(eventId: string, input: { name: string; price: numbe
   if (invalid) return Promise.reject(invalid);
   const ref = doc(menuCol(eventId));
   return write(setDoc(ref, { name: input.name, price: input.price, order: nextMenuOrder(items), soldOut: false }));
+}
+
+/**
+ * まとめて追加（parseBulkMenu の結果を、1バッチで）。order は、今の最大の続きから 10 ずつ。
+ * 合計が100件を超えるなら AppError('validation')（1件も書かない）。各行も、ここで検査する
+ */
+export function addMenuItemsBulk(eventId: string, lines: readonly ParsedLine[], items: readonly MenuItem[]): Promise<void> {
+  if (lines.length === 0) return Promise.resolve();
+  if (items.length + lines.length > MENU_MAX) {
+    return Promise.reject(validationError(`メニューは${MENU_MAX}件までです（いま${items.length}件。追加できるのは、あと${Math.max(0, MENU_MAX - items.length)}件）`));
+  }
+  for (const l of lines) {
+    const invalid = checkPatch(l);
+    if (invalid) return Promise.reject(Object.assign(invalid, { message: `${l.line}行目：${invalid.message}` }));
+  }
+  const start = nextMenuOrder(items);
+  const batch = writeBatch(db);
+  lines.forEach((l, k) => batch.set(doc(menuCol(eventId)), { name: l.name, price: l.price, order: start + k * ORDER_STEP, soldOut: false }));
+  return write(batch.commit());
 }
 
 /** 名前・価格・売り切れの更新。検査してから書く */

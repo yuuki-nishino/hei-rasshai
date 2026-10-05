@@ -14,7 +14,8 @@ vi.mock('../../src/lib/firebase/staff', async () => {
   };
 });
 
-const { addMenuItem, deleteMenuItem, moveMenuItem, updateMenuItem, watchMenu } = await import('../../src/lib/data/menu');
+const { addMenuItem, addMenuItemsBulk, deleteMenuItem, moveMenuItem, updateMenuItem, watchMenu } = await import('../../src/lib/data/menu');
+const { parseBulkMenu } = await import('../../src/lib/domain/menu');
 type MenuItem = import('../../src/lib/data/types').MenuItem;
 
 let env: RulesTestEnvironment;
@@ -112,6 +113,36 @@ describe('追加・更新・削除', () => {
     await seed({ a: { name: 'A', price: 100, order: 10 } });
     setUser('stranger');
     await expect(updateMenuItem('e1', 'a', { soldOut: true })).rejects.toMatchObject({ code: 'permission' });
+  });
+});
+
+describe('addMenuItemsBulk（#11）', () => {
+  it('parseBulkMenu の結果を、1バッチで、今の最大の続きの order で追加する', async () => {
+    await seed({ a: { name: 'A', price: 100, order: 10 } });
+    setUser(ALICE);
+    const items = await watchUntil((i) => i.length === 1).result;
+    const { ok, errors } = parseBulkMenu('たこ焼き 500\nラムネ,200\n焼きそば\u3000６００円');
+    expect(errors).toEqual([]);
+    await addMenuItemsBulk('e1', ok, items);
+    const after = await watchUntil((i) => i.length === 4).result;
+    expect(after.map((i) => [i.name, i.price, i.order])).toEqual([
+      ['A', 100, 10],
+      ['たこ焼き', 500, 20],
+      ['ラムネ', 200, 30],
+      ['焼きそば', 600, 40],
+    ]);
+  });
+
+  it('合計が100件を超えるなら、1件も書かない（validation）', async () => {
+    await seed();
+    setUser(ALICE);
+    const items = Array.from({ length: 99 }, (_, k) => ({ id: `m${k}`, name: 'x', price: 1, order: k, soldOut: false }));
+    const lines = [
+      { line: 1, name: 'a', price: 1 },
+      { line: 2, name: 'b', price: 1 },
+    ];
+    await expect(addMenuItemsBulk('e1', lines, items)).rejects.toMatchObject({ code: 'validation' });
+    await expect(addMenuItemsBulk('e1', lines.slice(0, 1), [])).resolves.toBeUndefined();
   });
 });
 
