@@ -1,9 +1,9 @@
 // 注文の状態・支払いのバッジ（visual.md §3、SPEC §7.5）
+// 値は data-model.md の orders.status / payment と同じ
+import type { OrderStatus, Payment } from '../lib/data/types';
 import styles from './Badge.module.css';
 
-// 値は data-model.md の orders.status / payment と同じ（型は、ドメイン層ができたら、そちらに寄せる）
-export type OrderStatus = 'preparing' | 'ready' | 'done' | 'cancelled';
-export type Payment = 'cash' | 'paypay';
+export type { OrderStatus, Payment };
 
 const statusLabel: Record<OrderStatus, string> = {
   preparing: '調理中',
