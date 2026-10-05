@@ -1,0 +1,56 @@
+// メニュー（data-model.md §2.5、data-access.md §3.4）
+export const MENU_MAX = 100;
+export const MENU_NAME_MAX = 40;
+export const PRICE_MIN = 1;
+export const PRICE_MAX = 100_000;
+export const ORDER_STEP = 10;
+
+/** 並べ替えに使う最小限の形 */
+export interface MenuOrderItem {
+  id: string;
+  order: number;
+}
+
+/** 名前：前後の空白を除き、1〜40文字（ルールと同じく UTF-16 の単位で数える）。不正なら null */
+export function parseMenuName(input: string): string | null {
+  const name = input.trim();
+  return name.length >= 1 && name.length <= MENU_NAME_MAX ? name : null;
+}
+
+/** 価格：1〜100,000 の整数。全角数字・桁区切りのカンマ・「円」「¥」を受け付ける。不正なら null */
+export function parsePrice(input: string): number | null {
+  const text = input
+    .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .replace(/[,，\s]/g, '')
+    .replace(/^[¥￥]/, '')
+    .replace(/円$/, '');
+  if (!/^\d+$/.test(text)) return null;
+  const price = Number(text);
+  return Number.isSafeInteger(price) && price >= PRICE_MIN && price <= PRICE_MAX ? price : null;
+}
+
+export const MENU_NAME_ERROR = `名前は1〜${MENU_NAME_MAX}文字で入れてください`;
+export const PRICE_ERROR = `価格は${PRICE_MIN}〜${PRICE_MAX.toLocaleString('ja-JP')}円の整数で入れてください`;
+
+/** 表示の順：order の昇順、同じ値なら id の順（端末によらず、決まった順になる） */
+export function sortMenu<T extends MenuOrderItem>(items: readonly T[]): T[] {
+  return [...items].sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/** 追加する品の order：最大 + 10（空なら 10） */
+export function nextMenuOrder(items: readonly MenuOrderItem[]): number {
+  return items.reduce((max, i) => Math.max(max, i.order), 0) + ORDER_STEP;
+}
+
+/**
+ * id の品を、上・下へ1つ動かし、全件の order を 10, 20, 30… に振り直す（同じ値になっていても動く）。
+ * 書き換えが要る品だけを返す。端で動かせないとき・見つからないときは []
+ */
+export function reorderMenu(items: readonly MenuOrderItem[], id: string, dir: 'up' | 'down'): { id: string; order: number }[] {
+  const sorted = sortMenu(items);
+  const i = sorted.findIndex((x) => x.id === id);
+  const j = dir === 'up' ? i - 1 : i + 1;
+  if (i < 0 || j < 0 || j >= sorted.length) return [];
+  [sorted[i], sorted[j]] = [sorted[j]!, sorted[i]!];
+  return sorted.map((x, k) => ({ id: x.id, order: (k + 1) * ORDER_STEP, before: x.order })).filter((x) => x.order !== x.before).map(({ id, order }) => ({ id, order }));
+}

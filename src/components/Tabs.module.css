@@ -1,0 +1,32 @@
+/* タブ。のれんの下に並べる。選んでいるタブは、弁柄の下線と太字 */
+.tabs {
+  display: flex;
+  gap: var(--sp-1);
+  max-width: 960px;
+  margin-inline: auto;
+  padding-inline: var(--sp-4);
+  border-bottom: 2px solid var(--color-line);
+  overflow-x: auto;
+}
+
+.tab {
+  flex: 1;
+  min-width: 5em;
+  min-height: var(--tap-min);
+  padding: var(--sp-2) var(--sp-3);
+  border: none;
+  border-bottom: 4px solid transparent;
+  margin-bottom: -2px;
+  background: transparent;
+  color: var(--color-ink-sub);
+  font-family: var(--font-hand);
+  font-size: var(--fs-lg);
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  border-bottom-color: var(--color-brand);
+  color: var(--color-ink);
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}

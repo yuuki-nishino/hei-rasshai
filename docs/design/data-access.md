@@ -77,10 +77,10 @@ type Unsubscribe = () => void;
 ### 3.4 menu.ts
 | 関数 | 内容 |
 |---|---|
-| `watchMenu(eventId, cb: (items: MenuItem[]) => void, onError): Unsubscribe` | `order` 昇順、同じ値のときは `id` 順に整えて返す |
+| `watchMenu(eventId, cb: (items: MenuItem[]) => void, onError): Unsubscribe` | `order` 昇順、同じ値のときは `id` 順に整えて返す（`sortMenu`）。書き込み関数の Promise は、サーバーが受け取ったときに終わる（オフラインなら、つながるまで終わらない）。画面は待たずに進め、拒否だけを `catch` で知らせる（#10） |
 | `addMenuItem(eventId, { name, price }, items): Promise<void>` | `order = 最大 + 10`。100件を超える場合は、`AppError('validation')` |
 | `updateMenuItem(eventId, id, patch: Partial<Pick<MenuItem, 'name'\|'price'\|'soldOut'>>): Promise<void>` | 検証してから書く（価格は1〜100,000） |
-| `moveMenuItem(eventId, id, dir: 'up' \| 'down', items): Promise<void>` | 並びを入れ替え、**全件の `order` を10, 20, 30…に振り直す**（1バッチ。同じ値になっていても動く） |
+| `moveMenuItem(eventId, id, dir: 'up' \| 'down', items): Promise<void>` | 並びを入れ替え、**全件の `order` を10, 20, 30…に振り直す**（1バッチ。同じ値になっていても動く）。計算は `reorderMenu`（`lib/domain/menu.ts`）で、値が変わる品だけを書く |
 | `deleteMenuItem(eventId, id): Promise<void>` | 過去の注文は、書き写し済みのため影響なし |
 | `addMenuItemsBulk(eventId, lines: ParsedLine[], items): Promise<void>` | `parseBulkMenu` の結果を、1バッチで追加。合計が100件を超える場合は、`AppError('validation')` |
 

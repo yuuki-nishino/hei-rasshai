@@ -3,25 +3,36 @@ import { Button } from '../components/Button';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Empty } from '../components/Feedback';
 import { Noren } from '../components/Noren';
+import { Tabs } from '../components/Tabs';
 import { formatDayRange } from '../lib/domain/day';
 import { currentUser } from '../state/auth';
 import { cacheClearAsk, confirmCacheClear } from '../state/cacheClear';
-import { selectEvent } from '../state/event';
+import { currentEventId, selectEvent } from '../state/event';
 import { logoutConfirm, logoutNow, requestLogout } from '../state/logout';
 import { currentEvent } from '../state/myEvents';
 import { joinEventId } from '../state/route';
+import { currentTab, selectTab, type TabId } from '../state/tab';
 import styles from './App.module.css';
 import { AuthGate } from './auth/AuthGate';
 import { EventGate } from './event/EventGate';
 import { JoinPage } from './join/JoinPage';
+import { MenuPage } from './menu/MenuPage';
 import { InvitePanel } from './members/InvitePanel';
 import { MembersPanel } from './members/MembersPanel';
 
-// イベントの中の仮の画面（注文などのタブは、#12 以降で足す。メンバー・招待は「イベント」タブができたら移す）
+// イベントの中の画面。タブ（注文・メニュー・イベント）。Shell（接続状態など）と、ほかのタブは、後のIssueで足す（screens.md §1.2）
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'order', label: '注文' },
+  { id: 'menu', label: 'メニュー' },
+  { id: 'event', label: 'イベント' },
+];
+
 function EventHome() {
   const event = currentEvent.value; // 一覧が届く前（オフラインの起動直後など）は undefined
+  const eventId = currentEventId.value;
   const uid = currentUser.value?.uid;
   const isOwner = !!event && !!uid && event.ownerUid === uid;
+  const tab = currentTab.value;
   return (
     <>
       <Noren
@@ -33,13 +44,19 @@ function EventHome() {
           </Button>
         }
       />
+      <Tabs tabs={TABS} selected={tab} onSelect={selectTab} label="画面の切り替え" />
       <main class={styles.main}>
-        <Empty title="注文の画面（準備中）" />
-        {event && uid && <MembersPanel eventId={event.id} uid={uid} isOwner={isOwner} />}
-        {event && uid && isOwner && <InvitePanel eventId={event.id} uid={uid} />}
-        <Button variant="secondary" onClick={() => void requestLogout()}>
-          ログアウト
-        </Button>
+        {tab === 'order' && <Empty title="注文の画面（準備中）" />}
+        {tab === 'menu' && eventId && <MenuPage eventId={eventId} />}
+        {tab === 'event' && (
+          <>
+            {event && uid && <MembersPanel eventId={event.id} uid={uid} isOwner={isOwner} />}
+            {event && uid && isOwner && <InvitePanel eventId={event.id} uid={uid} />}
+            <Button variant="secondary" onClick={() => void requestLogout()}>
+              ログアウト
+            </Button>
+          </>
+        )}
       </main>
     </>
   );

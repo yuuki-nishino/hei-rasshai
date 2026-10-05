@@ -18,6 +18,14 @@ export interface Member {
   email: string;
 }
 
+export interface MenuItem {
+  id: string;
+  name: string;
+  price: number;
+  order: number;
+  soldOut: boolean;
+}
+
 /** 招待。期限（発行の1日後）は、画面で inviteExpiresAt で計算する。createdAt は、書き込み直後は見積もりの時刻 */
 export interface Invite {
   email: string;

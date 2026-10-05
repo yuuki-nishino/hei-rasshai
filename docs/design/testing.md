@@ -137,6 +137,7 @@
 - #7 の結果：15・16b・21・23（`createEvent`）・26 は `test/data/events.test.ts` で確認した。**16a**（`permission-denied`）は、Emulator では作りにくい（購読の結果に出る `members` は、自分がメンバーであることを意味するため）ので、判定の部分を単体テスト（`src/lib/data/myEvents.test.ts`）で確かめた。15・16b も、判定の全分岐を単体テストで確かめている
 - #8 の結果（レビュー J1 の追加を含む）：確認の直後に通信が切れる場合（`getDocFromServer` の後に `disableNetwork`）も、`joinEvent`・`createEvent` が8秒で `timeout` になり、止まらないことを確かめた（つながり直すと、送信待ちの参加が通ることも確認）。10（参加・2回目は `already`・別のアカウント・使い切り）と、23（`createInvite`・`cancelInvite`・`joinEvent` のオフライン）を `test/data/invites.test.ts` で確認した。期限切れ（25時間前の招待）・削除中のイベントへの参加の拒否も確かめた
 - #9 の結果：24 は、判断に使う `hasPendingWrites`（別のイベントの未送信があれば true、送られれば false）を `test/data/members.test.ts` で確認した。消去そのもの（IndexedDB）は、結合テストのキャッシュがメモリのため、Emulator につないだ画面で確かめた（外されると、一覧に戻って消去・再読み込みされる。オフラインで書き込みを溜めてログアウトすると、警告が出る。通信があれば、警告なしでログアウトし、消去・再読み込みされる）。28 は、判断（`decideCacheClear`）を単体テストで、時刻を与えて確かめた（24時間ちょうどで確認に変わる）。あわせて、`watchMembers`・`removeMember` の権限（オーナーは外せる・メンバーは自分だけ・オーナーは抜けられない）とオフラインも確認した
+- #10 の結果：メニュー（`test/data/menu.test.ts`）：並び順（同じ `order` は `id` 順）、ほかのメンバーの変更のリアルタイムの反映、追加の `order`（最大＋10）、100件の上限、更新の検査、削除、メンバー以外の拒否、同じ `order` でも動く並べ替え（10, 20, 30 に振り直す）、オフラインでの受け付け（購読にすぐ反映され、つながると送られる）。計算（`parsePrice`・`reorderMenu` など）は単体テスト
 - #7 で分かったこと：ルールの文字数は UTF-16 の単位（絵文字は2文字）。画面の検査と `displayName` の切り詰めを、これに合わせた（data-model.md §2）
 
 ## 5. 実機の確認（手動）
