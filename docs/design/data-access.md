@@ -44,8 +44,8 @@ type Unsubscribe = () => void;
 ### 3.1 auth.ts
 | 関数 | 内容 |
 |---|---|
-| `onAuthChange(cb: (user: User \| null) => void): Unsubscribe` | ログイン状態の購読 |
-| `signInWithGoogle(): Promise<void>` | Googleログイン（popup / redirect。★U1で決める）。`prompt: 'select_account'` を指定する（別のアカウントを選べるように） |
+| `onAuthChange(cb: (user: AuthUser \| null) => void): Unsubscribe` | ログイン状態の購読。`AuthUser` は `{ uid, email, displayName }`（Firebase の `User` 型を UI に漏らさない） |
+| `signInWithGoogle(): Promise<'signed-in' \| 'cancelled'>` | Googleログイン（ポップアップ。★U1、DESIGN.md §6）。`prompt: 'select_account'` を指定する（別のアカウントを選べるように）。本人がポップアップを閉じたときは `'cancelled'`。通信エラーは `AppError('offline')`、ポップアップがブラウザに止められたときは `AppError('popup-blocked')` |
 | `signOut(): Promise<void>` | §8 の端末のキャッシュ消去を伴う |
 
 ### 3.2 events.ts
@@ -151,6 +151,7 @@ type AppErrorCode =
   | 'not-found'
   | 'conflict'     // 競合（他の端末が先に変更した）
   | 'validation'   // 入力・遷移が不正
+  | 'popup-blocked' // ログインのポップアップが、ブラウザに止められた（#5）
   | 'unknown';
 class AppError extends Error { code: AppErrorCode; cause?: unknown }
 ```
