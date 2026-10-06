@@ -5,7 +5,7 @@ import { Button } from '../../components/Button';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Loading } from '../../components/Feedback';
 import { AppError } from '../../lib/data/errors';
-import { changePayment, transitionOrder, watchOrdersOfDay } from '../../lib/data/orders';
+import { changeNote, changePayment, transitionOrder, watchOrdersOfDay } from '../../lib/data/orders';
 import type { Order } from '../../lib/data/types';
 import { toDay } from '../../lib/domain/day';
 import { planCancel, sortOrders, type OrderAction } from '../../lib/domain/orderStatus';
@@ -14,6 +14,7 @@ import { activeOrders, activeOrdersError } from '../../state/orders';
 import { showToast } from '../../state/toast';
 import { OrderCard } from './OrderCard';
 import styles from './KitchenPage.module.css';
+import { NoteDialog } from './NoteDialog';
 import { QrDialog } from './QrDialog';
 
 type Column = 'cooking' | 'ready';
@@ -48,6 +49,7 @@ export function KitchenPage({ eventId, uid }: { eventId: string; uid: string }) 
   // 取り消しの確認は、注文のコピーではなく、id を持つ（確認を押した時点の最新の注文で判断する。レビュー M1）
   const [cancelling, setCancelling] = useState<{ id: string; number: number } | null>(null);
   const [qrOrder, setQrOrder] = useState<Order | null>(null);
+  const [noteOrder, setNoteOrder] = useState<Order | null>(null);
 
   // 「済みも表示」を入れたときだけ、今日の全状態を購読する
   useEffect(() => {
@@ -84,7 +86,7 @@ export function KitchenPage({ eventId, uid }: { eventId: string; uid: string }) 
   };
   const togglePayment = (order: Order) => report(changePayment(eventId, order.id, order.payment === 'cash' ? 'paypay' : 'cash', uid), order.number);
 
-  const card = (o: Order) => <OrderCard order={o} today={today} now={now} onAction={act} onTogglePayment={togglePayment} onQr={setQrOrder} />;
+  const card = (o: Order) => <OrderCard order={o} today={today} now={now} onAction={act} onTogglePayment={togglePayment} onQr={setQrOrder} onEditNote={setNoteOrder} />;
 
   return (
     <section class={styles.page} aria-labelledby="kitchen-title">
@@ -181,6 +183,16 @@ export function KitchenPage({ eventId, uid }: { eventId: string; uid: string }) 
       </ConfirmDialog>
 
       <QrDialog eventId={eventId} order={qrOrder} onClose={() => setQrOrder(null)} />
+
+      <NoteDialog
+        order={noteOrder}
+        onClose={() => setNoteOrder(null)}
+        onSave={(orderId, note) => {
+          const o = noteOrder;
+          setNoteOrder(null);
+          if (o) report(changeNote(eventId, orderId, note, uid), o.number); // 待たずに閉じる。拒否されたときだけ知らせる
+        }}
+      />
     </section>
   );
 }

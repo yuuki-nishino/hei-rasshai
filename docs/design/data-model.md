@@ -83,6 +83,7 @@ erDiagram
         string day
         int total
         string payment "cash / paypay"
+        string note "メモ（任意・100文字まで）"
         string status
         string cancelledFrom
         boolean qr
@@ -185,6 +186,7 @@ erDiagram
 | items | array | ○ | 下記。1〜50行 | 不可 |
 | total | int | ○ | `Σ price × qty`。1以上 | 不可 |
 | payment | 'cash' \| 'paypay' | ○ | | **可** |
+| note | string | | 0〜100文字（UTF-16 の単位。絵文字は2文字）。任意（項目が無い・空は、メモなし）。調理で気をつけること（「辛さ抜き」）。お客様画面には出さない（#40） | **可** |
 | status | 'preparing' \| 'ready' \| 'done' \| 'cancelled' | ○ | | 可（遷移表に従う） |
 | cancelledFrom | 'preparing' \| 'ready' \| 'done' \| null | ○ | 取り消し前の状態。取り消し中だけ値を持つ | 可 |
 | qr | boolean | ○ | QRを発行した（待ちあり）注文か | 不可 |
@@ -252,6 +254,7 @@ erDiagram
 
 - どの更新でも、`updatedBy = uid`、`updatedAt = serverTimestamp` を書く
 - 支払い方法の変更は、`payment`、`updatedBy`、`updatedAt` のみ書く（状態は変えない）
+- メモの変更は、`note`、`updatedBy`、`updatedAt` のみ書く（状態は変えない。空にするときは、空の文字列を書く。#40）
 - 「渡したを戻す」で ready に戻した注文の `doneAt` は `null`。「取り消しを戻す」で復帰した注文の時刻項目は、取り消し前のまま
 
 ## 4. インデックスとクエリ
@@ -324,7 +327,7 @@ PayPay ¥8,500（20件）
 
 ### 5.5 CSV（注文一覧）
 - 文字コード：UTF-8（BOM付き）、改行：CRLF、区切り：カンマ。セルは `"` で囲み、中の `"` は `""` にする。先頭が `= + - @`・タブ・`\r` のセルは、先頭に `'` を足す（表計算ソフトの式として実行されないように）
-- 列：`日付, 番号, 状態, 支払い, 合計, 品目, 作成, 完成, 渡し, 取り消し`
+- 列：`日付, 番号, 状態, 支払い, 合計, 品目, メモ, 作成, 完成, 渡し, 取り消し`（メモの列は、#40 で足した。実装は #18）
   - 状態：調理中／できあがり／お渡し済み／取り消し
   - 品目：`名前×数量` を `; ` で連結
   - 時刻：JSTの `HH:mm:ss`

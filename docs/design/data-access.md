@@ -98,6 +98,7 @@ type Unsubscribe = () => void;
 | `fetchOrdersOfDayFromServer(eventId, day): Promise<Order[]>` | レジ締め用（`getDocsFromServer`）。オフラインなら `AppError('offline')` |
 | `transitionOrder(eventId, order, action: OrderAction, uid): Promise<void>` | 下記。`updateDoc`（オフラインでも受け付ける） |
 | `changePayment(eventId, orderId, payment, uid): Promise<void>` | |
+| `changeNote(eventId, orderId, note, uid): Promise<void>` | メモの変更（#40）。`note` は `normalizeNote`（`lib/domain/note.ts`：改行は空白に、前後の空白を除く。100文字まで）済みのもの。空にもできる。101文字以上は、書く前に `AppError('validation')`。`changePayment` と同じく、オフラインでも受け付ける（`trackWrite` の対象にするのは #19）。同時に直したときは、後から届いた方が勝つ |
 
 ```ts
 type OrderAction = 'ready' | 'backToPreparing' | 'done' | 'backToReady' | 'cancel' | 'restore';

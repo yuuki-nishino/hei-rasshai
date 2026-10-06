@@ -19,6 +19,8 @@ export const cartLines = signal<CartLine[]>([]);
 export const payment = signal<Payment>('cash');
 /** お預りの入力（文字のまま。parseTendered で読む） */
 export const tenderedText = signal('');
+/** メモの入力（文字のまま。normalizeNote で整える） */
+export const noteText = signal('');
 export const qr = signal(readStorage('hei:qr') !== 'false'); // 初期値は「発行する」
 
 export const cartTotal = computed(() => calcTotal(cartLines.value));
@@ -33,6 +35,7 @@ export function clearCart(): void {
   cartLines.value = [];
   payment.value = 'cash';
   tenderedText.value = '';
+  noteText.value = '';
 }
 
 let cartEventId = currentEventId.peek();
@@ -70,4 +73,8 @@ export function setPayment(p: Payment): void {
 
 export function setTendered(text: string): void {
   tenderedText.value = text;
+}
+
+export function setNote(text: string): void {
+  noteText.value = text;
 }

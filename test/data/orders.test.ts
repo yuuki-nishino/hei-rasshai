@@ -1,6 +1,6 @@
 // 注文の確定と「やめる」（testing.md §4 #1〜8・#12、order-confirm.md §5、ADR-0004）
 import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { disableNetwork, Timestamp } from 'firebase/firestore';
+import { disableNetwork, enableNetwork, Timestamp } from 'firebase/firestore';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { asUser, closeUsers, createEnv, emailOf, setUnreachableUser, setUser, waitFor } from './helpers';
 
@@ -14,7 +14,7 @@ vi.mock('../../src/lib/firebase/staff', async () => {
   };
 });
 
-const { changePayment, confirmOrder, findOrderOnServer, newOrderId, transitionOrder, voidExistsOnServer, voidOrFind, watchActiveOrders, watchOrdersOfDay } =
+const { changeNote, changePayment, confirmOrder, findOrderOnServer, newOrderId, transitionOrder, voidExistsOnServer, voidOrFind, watchActiveOrders, watchOrdersOfDay } =
   await import('../../src/lib/data/orders');
 type ConfirmContext = import('../../src/lib/domain/confirmFlow').ConfirmContext;
 
@@ -371,5 +371,112 @@ describe('watchActiveOrders / watchOrdersOfDay', () => {
     await asUser(alice, async () => transitionOrder('e1', (await findOrderOnServer('e1', id))!, 'ready', ALICE));
     await waitFor(() => (latest?.[0]?.status === 'ready' ? true : undefined));
     (await unsub)();
+  });
+});
+
+// ---- #40：注文のメモ ----
+describe('メモ（#40）', () => {
+  const withNote = (note: string | undefined): ConfirmContext => ({
+    ...ctxOf('x'),
+    draft: { ...ctxOf('x').draft, ...(note === undefined ? {} : { note }) },
+  });
+
+  it('確定すると、メモが注文に保存される。メモなし（空）も', async () => {
+    setUser(ALICE);
+    const a = newOrderId('e1');
+    const b = newOrderId('e1');
+    await confirmOrder('e1', { ...withNote('辛さ抜き'), orderId: a }, ALICE);
+    await confirmOrder('e1', { ...withNote(''), orderId: b }, ALICE);
+    expect((await findOrderOnServer('e1', a))?.note).toBe('辛さ抜き');
+    expect((await findOrderOnServer('e1', b))?.note).toBe('');
+    expect((await rawOrder(a)).note).toBe('辛さ抜き');
+  });
+
+  it('同じ orderId での再確定（再試行・復元）は、二重にならず、メモも最初のまま', async () => {
+    setUser(ALICE);
+    const id = newOrderId('e1');
+    const first = await confirmOrder('e1', { ...withNote('辛さ抜き'), orderId: id }, ALICE);
+    const again = await confirmOrder('e1', { ...withNote('辛さ抜き'), orderId: id }, ALICE);
+    expect(again.number).toBe(first.number);
+    expect(again.note).toBe('辛さ抜き');
+    expect((await serverState(id)).orders).toBe(1);
+  });
+
+  it('メモの項目が無い、古い pending（draft に note が無い）でも確定できる（メモは空）', async () => {
+    setUser(ALICE);
+    const id = newOrderId('e1');
+    const order = await confirmOrder('e1', { ...withNote(undefined), orderId: id }, ALICE);
+    expect(order.note).toBe('');
+    expect((await findOrderOnServer('e1', id))?.note).toBe('');
+  });
+
+  it('メモの項目が無い、古い注文を読める（メモは空として扱う）。あとから、メモを足せる', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const { storedOrder } = await import('../rules/helpers');
+      await ctx.firestore().doc('events/e1/orders/old').set(storedOrder({ createdAt: old, updatedAt: old }));
+    });
+    setUser(ALICE);
+    expect((await findOrderOnServer('e1', 'old'))?.note).toBe('');
+    await changeNote('e1', 'old', '後から足した', ALICE);
+    expect((await findOrderOnServer('e1', 'old'))?.note).toBe('後から足した');
+  });
+
+  it('changeNote：確定後に、メモを足す・変える・空にする。状態・品目・合計は変わらない。更新者・更新時刻が残る', async () => {
+    setUser(ALICE);
+    const id = newOrderId('e1');
+    await confirmOrder('e1', { ...withNote('辛さ抜き'), orderId: id }, ALICE);
+    await changeNote('e1', id, 'ネギ抜き', ALICE);
+    expect(await rawOrder(id)).toMatchObject({ note: 'ネギ抜き', status: 'preparing', total: 1000, updatedBy: ALICE });
+    await changeNote('e1', id, '', ALICE);
+    expect((await rawOrder(id)).note).toBe('');
+  });
+
+  it('changeNote：お渡し済み・取り消しの注文のメモも変えられる', async () => {
+    setUser(ALICE);
+    const id = newOrderId('e1');
+    await confirmOrder('e1', { ...withNote('x'), orderId: id, draft: { ...ctxOf('x').draft, qr: false, note: 'x' } }, ALICE);
+    await changeNote('e1', id, '渡し済みのメモ', ALICE);
+    await transitionOrder('e1', (await findOrderOnServer('e1', id))!, 'cancel', ALICE);
+    await changeNote('e1', id, '取り消し後のメモ', ALICE);
+    expect(await rawOrder(id)).toMatchObject({ note: '取り消し後のメモ', status: 'cancelled' });
+  });
+
+  it('changeNote：101文字は、書く前に validation。メンバーでない人は、permission', async () => {
+    setUser(ALICE);
+    const id = newOrderId('e1');
+    await confirmOrder('e1', ctxOf(id), ALICE);
+    await expect(changeNote('e1', id, 'あ'.repeat(101), ALICE)).rejects.toMatchObject({ code: 'validation' });
+    setUser(BOB);
+    await expect(changeNote('e1', id, 'x', BOB)).rejects.toMatchObject({ code: 'permission' });
+  });
+
+  it('ほかのメンバーの修正が、購読に届く', async () => {
+    const alice = setUser(ALICE);
+    const owner = setUser('owner');
+    const id = newOrderId('e1');
+    await asUser(alice, () => confirmOrder('e1', { ...withNote('辛さ抜き'), orderId: id }, ALICE));
+    let latest: Order[] | undefined;
+    const unsub = asUser(owner, async () => watchActiveOrders('e1', (o) => (latest = o), () => {}));
+    await waitFor(() => (latest?.[0]?.note === '辛さ抜き' ? true : undefined));
+    await asUser(alice, () => changeNote('e1', id, 'やっぱり普通で', ALICE));
+    await waitFor(() => (latest?.[0]?.note === 'やっぱり普通で' ? true : undefined));
+    (await unsub)();
+  });
+
+  it('オフラインでも受け付ける：購読にはすぐ反映され、つながると、サーバーに届く', async () => {
+    const db = setUser(ALICE);
+    const id = newOrderId('e1');
+    await confirmOrder('e1', ctxOf(id), ALICE);
+    let latest: Order[] | undefined;
+    const unsub = watchActiveOrders('e1', (o) => (latest = o), () => {});
+    await waitFor(() => (latest?.[0]?.id === id ? true : undefined));
+    await disableNetwork(db);
+    const sent = changeNote('e1', id, 'オフラインで書いたメモ', ALICE); // サーバーが受け取るまで、終わらない
+    await waitFor(() => (latest?.[0]?.note === 'オフラインで書いたメモ' && latest[0].pending ? true : undefined));
+    expect((await rawOrder(id)).note ?? '').toBe('');
+    await enableNetwork(db);
+    await sent;
+    expect((await rawOrder(id)).note).toBe('オフラインで書いたメモ');
+    unsub();
   });
 });

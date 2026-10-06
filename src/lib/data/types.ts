@@ -36,6 +36,8 @@ export interface Order {
   items: OrderLine[];
   total: number;
   payment: Payment;
+  /** メモ（無い注文は、空） */
+  note: string;
   status: OrderStatus;
   cancelledFrom: Exclude<OrderStatus, 'cancelled'> | null;
   qr: boolean;

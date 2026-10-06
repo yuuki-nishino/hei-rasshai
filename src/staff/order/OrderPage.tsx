@@ -3,7 +3,9 @@
 import { useState } from 'preact/hooks';
 import { Button } from '../../components/Button';
 import { Empty, ErrorView, Loading } from '../../components/Feedback';
+import { TextField } from '../../components/TextField';
 import type { MenuItem } from '../../lib/data/types';
+import { normalizeNote, NOTE_MAX } from '../../lib/domain/note';
 import { calcChange, formatYen, lineNotice, parseTendered, QTY_MAX, type CartLine } from '../../lib/domain/order';
 import {
   addItemToCart,
@@ -12,10 +14,12 @@ import {
   cartTotal,
   changeLineQty,
   clearCart,
+  noteText,
   payment,
   qr,
   removeCartLine,
   setPayment,
+  setNote,
   setQr,
   setTendered,
   tenderedText,
@@ -70,6 +74,17 @@ export function OrderPage({ eventId }: { eventId: string }) {
       </section>
 
       <Cart lines={lines} menu={items} />
+
+      {/* メモ（#40）：調理画面のカードに出る。確定後も、調理画面から直せる */}
+      <TextField
+        label="メモ（任意）"
+        placeholder="例：辛さ抜き"
+        maxLength={NOTE_MAX}
+        hint="調理画面に出ます。お客様に見られることがあるので、個人の名前などは書かないでください"
+        value={noteText.value}
+        error={normalizeNote(noteText.value) === null ? `メモは${NOTE_MAX}文字までです` : null}
+        onInput={(e) => setNote(e.currentTarget.value)}
+      />
 
       <Options />
 
@@ -259,6 +274,7 @@ function Options() {
 function Footer({ onConfirm }: { onConfirm: () => void }) {
   const empty = cartLines.value.length === 0;
   const busy = confirmState.value.kind !== 'idle';
+  const noteInvalid = normalizeNote(noteText.value) === null; // 100文字を超えているとき（入力欄の maxLength で、ふつうは起きない）
   return (
     <div class={styles.footer}>
       <div class={styles.footerInner}>
@@ -267,7 +283,7 @@ function Footer({ onConfirm }: { onConfirm: () => void }) {
           <span class={styles.totalValue}>{formatYen(cartTotal.value)}</span>
         </div>
         {/* カートが空のとき・前の注文の確定の途中は、確定できない。前の注文の確認中（pending）の復元は #14 */}
-        <Button variant="primary" big block disabled={empty || busy} onClick={onConfirm}>
+        <Button variant="primary" big block disabled={empty || busy || noteInvalid} onClick={onConfirm}>
           {busy ? '前の注文の確定中' : empty ? 'メニューを選んでください' : '確定'}
         </Button>
       </div>
