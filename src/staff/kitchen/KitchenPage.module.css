@@ -1,0 +1,155 @@
+.page {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.h2 {
+  font-family: var(--font-hand);
+  font-size: var(--fs-xl);
+  font-weight: 400;
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+.showDone {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--tap-min);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.showDone input {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--color-brand);
+}
+
+/* スマホ縦：調理中／できあがりを、タブで切り替える。広い画面：2列 */
+.switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+
+.switchButton {
+  min-height: var(--tap-big);
+  border: 2px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink-sub);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.switchButton[aria-pressed='true'] {
+  color: var(--color-ink);
+}
+
+.switchButton.cooking[aria-pressed='true'] {
+  border-color: var(--status-cooking-fg);
+  background: var(--status-cooking-bg);
+  color: var(--status-cooking-fg);
+}
+
+.switchButton.ready[aria-pressed='true'] {
+  border-color: var(--status-ready-fg);
+  background: var(--status-ready-bg);
+  color: var(--status-ready-fg);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.column {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.columnHead {
+  display: none;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  font-weight: 800;
+}
+
+.columnHead.cooking {
+  background: var(--status-cooking-bg);
+  color: var(--status-cooking-fg);
+}
+
+.columnHead.ready {
+  background: var(--status-ready-bg);
+  color: var(--status-ready-fg);
+}
+
+.list {
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.empty {
+  padding: var(--sp-6) var(--sp-4);
+  border: 2px dashed var(--color-line);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--color-ink-sub);
+}
+
+.finishedTitle {
+  margin-top: var(--sp-4);
+  font-family: var(--font-hand);
+  font-size: var(--fs-lg);
+}
+
+.finishedList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 広い画面（タブレット横など）は、2列を同時に見せる */
+@media (min-width: 720px) {
+  .columnHead {
+    display: flex;
+  }
+
+  .switch {
+    display: none;
+  }
+}
+
+/* スマホ縦：選んでいない列は、隠す */
+@media (max-width: 719px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+
+  .column[data-hidden='true'] {
+    display: none;
+  }
+}

@@ -1,0 +1,41 @@
+.dialog {
+  width: min(100% - 2 * var(--sp-4), 360px);
+  padding: var(--sp-6) var(--sp-5) var(--sp-5);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-float);
+}
+
+.dialog::backdrop {
+  background: rgb(43 38 34 / 0.55);
+}
+
+.body {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+  text-align: center;
+}
+
+.number {
+  font-family: var(--font-hand);
+  font-size: 4rem;
+  line-height: 1;
+  color: var(--color-brand);
+  -webkit-text-stroke: 0.04em currentColor;
+  paint-order: stroke fill;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  margin-left: 4px;
+  font-size: var(--fs-2xl);
+  -webkit-text-stroke-width: var(--hand-bold);
+}
+
+.hint {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+}

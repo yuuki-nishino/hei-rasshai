@@ -30,3 +30,24 @@
   -webkit-text-stroke: var(--hand-bold) currentColor;
   paint-order: stroke fill;
 }
+
+/* 件数の印：赤い丸に白い数字（LINE の通知のように）。文字と同じ行の右上に、少し浮かせる */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  font-family: var(--font-sys);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 0;
+  vertical-align: 2px;
+}

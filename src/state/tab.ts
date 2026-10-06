@@ -2,8 +2,8 @@
 import { signal } from '@preact/signals';
 import { readStorage, writeStorage } from './storage';
 
-export type TabId = 'order' | 'menu' | 'event';
-const TAB_IDS: readonly TabId[] = ['order', 'menu', 'event'];
+export type TabId = 'order' | 'kitchen' | 'menu' | 'event';
+const TAB_IDS: readonly TabId[] = ['order', 'kitchen', 'menu', 'event'];
 const KEY = 'hei:tab';
 
 const saved = readStorage(KEY);
