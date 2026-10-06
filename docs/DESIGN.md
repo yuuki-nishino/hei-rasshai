@@ -33,7 +33,7 @@
 | [design/visual.md](./design/visual.md) | 見た目の設計（雰囲気・色・文字・余白・共通部品・ロゴ） |
 | [design/testing.md](./design/testing.md) | テスト計画（ドメイン・ルール・結合・実機） |
 
-設計判断の記録：[ADR-0001 Preact](./adr/0001-use-preact.md)、[ADR-0002 PWAの範囲](./adr/0002-pwa-scope.md)、[ADR-0003 招待はメールアドレス宛て](./adr/0003-invite-by-email.md)、[ADR-0004 「やめる」は墓標で排他する](./adr/0004-void-tombstone.md)、[ADR-0005 スタッフ用とお客様用を別々にビルドする](./adr/0005-separate-builds.md)
+設計判断の記録：[ADR-0001 Preact](./adr/0001-use-preact.md)、[ADR-0002 PWAの範囲](./adr/0002-pwa-scope.md)、[ADR-0003 招待はメールアドレス宛て](./adr/0003-invite-by-email.md)、[ADR-0004 「やめる」は墓標で排他する](./adr/0004-void-tombstone.md)、[ADR-0005 スタッフ用とお客様用を別々にビルドする](./adr/0005-separate-builds.md)、[ADR-0006 CSSは素のCSS＋CSS Modules（Tailwindを入れない）](./adr/0006-plain-css-modules.md)、[ADR-0007 注文のメモは注文の文書に置く](./adr/0007-note-in-order-doc.md)
 
 ## 3. 技術構成
 
