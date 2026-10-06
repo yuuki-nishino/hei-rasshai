@@ -43,6 +43,11 @@ service cloud.firestore {
           && d.deleting is bool;
     }
 
+    // 注文のメモ（#40）。任意（無い・空でもよい）。文字列で100文字まで。確定後も、メンバーが変更できる
+    function validNote(d) {
+      return d.get('note', '') is string && d.get('note', '').size() <= 100;
+    }
+
     function validMenu(d) {
       return d.keys().hasOnly(['name', 'price', 'order', 'soldOut'])
           && d.name is string && d.name.size() >= 1 && d.name.size() <= 40
@@ -146,8 +151,9 @@ service cloud.firestore {
           // 書き込みの後に、墓標が無い（墓標は、イベントの削除中以外は消せないため、「前に無い」も意味する）
           && !existsAfter(subPath(eventId, 'voids', orderId))
           && request.resource.data.keys().hasOnly(
-               ['number', 'day', 'items', 'total', 'payment', 'status', 'cancelledFrom', 'qr',
+               ['number', 'day', 'items', 'total', 'payment', 'status', 'cancelledFrom', 'qr', 'note',
                 'createdAt', 'readyAt', 'doneAt', 'cancelledAt', 'createdBy', 'updatedBy', 'updatedAt'])
+          && validNote(request.resource.data)
           && request.resource.data.createdBy == request.auth.uid
           && request.resource.data.updatedBy == request.auth.uid
           && request.resource.data.createdAt == request.time
@@ -174,11 +180,12 @@ service cloud.firestore {
           && getAfter(subPath(eventId, 'counters', request.resource.data.day)).data.n
                == request.resource.data.number;
 
-        // 作成後に変えられるのは、状態・支払い方法・時刻・更新者だけ
+        // 作成後に変えられるのは、状態・支払い方法・メモ・時刻・更新者だけ
         allow update: if isMember(eventId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-               ['status', 'payment', 'cancelledFrom', 'readyAt', 'doneAt',
+               ['status', 'payment', 'note', 'cancelledFrom', 'readyAt', 'doneAt',
                 'cancelledAt', 'updatedBy', 'updatedAt'])
+          && validNote(request.resource.data)
           && request.resource.data.payment in ['cash', 'paypay']
           && request.resource.data.updatedBy == request.auth.uid
           && request.resource.data.updatedAt == request.time
