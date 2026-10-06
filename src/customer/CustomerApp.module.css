@@ -1,0 +1,180 @@
+/* お客様画面：Webフォント・画像を使わない（screens.md §4.3）。大きな番号と、色・文字の大きな変化で、状況を伝える */
+.main {
+  display: grid;
+  gap: var(--sp-5);
+  max-width: 480px;
+  margin-inline: auto;
+  padding: var(--sp-4) var(--sp-4) calc(var(--sp-10) + env(safe-area-inset-bottom, 0px));
+}
+
+.card {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-6) var(--sp-4);
+  border: 3px solid var(--status-bd);
+  border-radius: var(--radius-lg);
+  background: var(--status-bg);
+  color: var(--status-fg);
+  text-align: center;
+  transition: background-color var(--dur) ease;
+}
+
+.preparing {
+  --status-bg: var(--status-cooking-bg);
+  --status-fg: var(--status-cooking-fg);
+  --status-bd: var(--status-cooking-fg);
+}
+
+/* できあがり：いちばん目立たせる（iPhone は振動しないため、色と大きな表示の変化で、気付けるようにする） */
+.ready {
+  --status-bg: var(--status-ready-bg);
+  --status-fg: var(--status-ready-fg);
+  --status-bd: var(--status-ready-fg);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.done {
+  --status-bg: var(--status-done-bg);
+  --status-fg: var(--status-done-fg);
+  --status-bd: var(--status-done-fg);
+}
+
+.cancelled {
+  --status-bg: var(--status-void-bg);
+  --status-fg: var(--status-void-fg);
+  --status-bd: var(--status-void-fg);
+}
+
+.label {
+  font-size: var(--fs-md);
+  font-weight: 700;
+}
+
+.number {
+  margin: 0;
+  font-size: 7rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.numberUnit {
+  margin-left: 4px;
+  font-size: var(--fs-2xl);
+}
+
+.ready .number {
+  font-size: 8rem;
+}
+
+.badge {
+  padding: var(--sp-1) var(--sp-5);
+  border-radius: var(--radius-pill);
+  background: var(--status-fg);
+  color: var(--status-bg);
+  font-size: var(--fs-xl);
+  font-weight: 800;
+}
+
+.ready .badge {
+  font-size: 1.75rem; /* 「へい、お待ち！」が、狭い画面でも、1行に収まる大きさ */
+  white-space: nowrap;
+}
+
+.message {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+}
+
+.detail {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.items {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.itemName {
+  overflow-wrap: anywhere;
+}
+
+.total {
+  display: flex;
+  justify-content: space-between;
+  padding-top: var(--sp-2);
+  border-top: 1px dashed var(--color-line);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+.unstable {
+  font-weight: 700;
+  color: var(--status-cooking-fg);
+}
+
+.notice {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-6) var(--sp-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  text-align: center;
+}
+
+.noticeTitle {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+
+.noticeError {
+  color: var(--status-void-fg);
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-ink-sub);
+  font-size: var(--fs-sm);
+}
+
+@keyframes pulse {
+  50% {
+    transform: scale(1.015);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ready {
+    animation: none;
+  }
+}

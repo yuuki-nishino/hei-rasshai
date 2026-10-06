@@ -10,3 +10,4 @@ export * from './confirmFlow';
 export * from './url';
 export * from './orderStatus';
 export * from './note';
+export * from './customerView';
