@@ -45,7 +45,8 @@ export function watchOrder(eventId: string, orderId: string, cb: (snapshot: Cust
       doc(db, 'events', eventId, 'orders', orderId),
       { includeMetadataChanges: true },
       (snap) => {
-        failures = 0; // つながった
+        // つながった（サーバーの結果）。キャッシュの結果では、戻さない（永続的なエラーの直前に、キャッシュの結果が届いても、間隔が戻り続けないように。PR #44 の再レビュー R2）
+        if (!snap.metadata.fromCache) failures = 0;
         cb({ kind: 'doc', order: snap.exists() ? toCustomerOrder(snap.data()) : null, fromCache: snap.metadata.fromCache });
       },
       () => {
