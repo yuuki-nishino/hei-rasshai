@@ -64,6 +64,11 @@ export function ClosingPage({ eventId, uid }: { eventId: string; uid: string }) 
   useEffect(() => {
     eventFloatRef.current = eventFloat;
   }, [eventFloat]);
+  // 保存の取り直しを待つ間に、日付を変えられたら、古い日の結果を捨てる（レビュー 再レビューの ℹ️）
+  const dayRef = useRef(day);
+  useEffect(() => {
+    dayRef.current = day;
+  }, [day]);
 
   // 締めた人の表示名を引くため（引けないときは「（退会済み）」。screens.md §1.4）
   useEffect(() => watchMembers(eventId, setMembers, () => {}), [eventId]);
@@ -121,6 +126,7 @@ export function ClosingPage({ eventId, uid }: { eventId: string; uid: string }) 
     try {
       // 保存の直前に、サーバーから取得し直す。画面の数字から変わっていたら、書かずに、新しい数字を見せて確かめてもらう（レビュー C1）
       const latest = summarize(await fetchOrdersOfDayFromServer(eventId, day));
+      if (dayRef.current !== day) return;
       if (latest.cashTotal !== loaded.summary.cashTotal) {
         setLoad({ status: 'ok', summary: latest, closing: loaded.closing });
         setSaveError(
