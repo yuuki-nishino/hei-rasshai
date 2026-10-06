@@ -73,12 +73,28 @@ function openUser(uid: string, port: number): Firestore {
   return db;
 }
 
+/**
+ * ログインしていない利用者（お客様）の db（メモリキャッシュのみ。お客様用の初期化と同じ）。
+ * lib/data/customerOrder は、lib/firebase/customer の db を使うため、そちらの差し替え先（customerHolder）に入れる
+ */
+export const customerHolder: { db: Firestore | null } = { db: null };
+
+export function setCustomer(): Firestore {
+  const app = initializeApp({ projectId, apiKey: 'demo' }, `customer-${++seq}`);
+  const db = initializeFirestore(app, { localCache: memoryLocalCache() });
+  connectFirestoreEmulator(db, '127.0.0.1', 8080); // mockUserToken なし＝未ログイン
+  opened.push({ app, db });
+  customerHolder.db = db;
+  return db;
+}
+
 export async function closeUsers(): Promise<void> {
   for (const { app, db } of opened.splice(0)) {
     await terminate(db);
     await deleteApp(app);
   }
   holder.db = null;
+  customerHolder.db = null;
 }
 
 export const authUser = (uid: string, displayName: string | null = uid) => ({ uid, email: emailOf(uid), displayName });
