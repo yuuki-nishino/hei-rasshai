@@ -1,0 +1,33 @@
+.dialog {
+  width: min(100% - 2 * var(--sp-4), 440px);
+  padding: var(--sp-6) var(--sp-5) var(--sp-5);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-float);
+}
+
+.dialog::backdrop {
+  background: rgb(43 38 34 / 0.55);
+}
+
+.form {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.title {
+  font-family: var(--font-hand);
+  font-size: var(--fs-xl);
+  font-weight: 400;
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+/* 保存とやめるは離して置く（押し間違いを防ぐ） */
+.actions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-6);
+}

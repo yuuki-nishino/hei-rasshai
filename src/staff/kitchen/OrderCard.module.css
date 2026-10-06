@@ -121,3 +121,32 @@
 .danger {
   margin-left: auto;
 }
+
+/* メモ：濃い地に白い文字。状態の色（調理中＝黄・できあがり＝緑・済み＝灰・取り消し＝赤）と、混ざらない */
+.note {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-ink);
+  color: var(--color-surface);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+}
+
+.noteLabel {
+  flex: none;
+  padding: 0 8px;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+.noteText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

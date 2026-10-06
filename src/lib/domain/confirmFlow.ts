@@ -9,6 +9,8 @@ export interface ConfirmDraft {
   total: number;
   payment: 'cash' | 'paypay';
   qr: boolean;
+  /** メモ（#40）。この項目が無い、古い pending の記録は、空として扱う */
+  note?: string;
 }
 
 /** 1回の確定の文脈。再試行でも orderId・day は変えない */

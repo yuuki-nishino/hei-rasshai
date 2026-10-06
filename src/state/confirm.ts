@@ -7,8 +7,9 @@ import { confirmOrder, findOrderOnServer, newOrderId, voidExistsOnServer, voidOr
 import type { Order } from '../lib/data/types';
 import { initialConfirmState, type ConfirmContext, type ConfirmedOrder, type ConfirmState } from '../lib/domain/confirmFlow';
 import { toDay } from '../lib/domain/day';
+import { normalizeNote } from '../lib/domain/note';
 import { parseTendered } from '../lib/domain/order';
-import { cartLines, cartTotal, clearCart, payment, qr, tenderedText } from './cart';
+import { cartLines, cartTotal, clearCart, noteText, payment, qr, tenderedText } from './cart';
 import { createConfirmRunner, whenSettled, type InflightTracker, type PendingRecord } from './confirmRunner';
 import { currentEventId } from './event';
 import { readStorage, writeStorage } from './storage';
@@ -117,7 +118,7 @@ function newContext(eventId: string): ConfirmContext {
   return {
     orderId: newOrderId(eventId),
     day: toDay(), // 確定ボタンの時点の日付。再試行でも変えない
-    draft: { items, total: cartTotal.peek(), payment: payment.peek(), qr: qr.peek() },
+    draft: { items, total: cartTotal.peek(), payment: payment.peek(), qr: qr.peek(), note: normalizeNote(noteText.peek()) ?? '' },
     tendered: payment.peek() === 'cash' ? (parseTendered(tenderedText.peek()) ?? 0) : 0,
   };
 }

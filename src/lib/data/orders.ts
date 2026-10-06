@@ -14,6 +14,7 @@ import {
   type Timestamp,
 } from 'firebase/firestore';
 import type { ConfirmContext } from '../domain/confirmFlow';
+import { NOTE_MAX } from '../domain/note';
 import { sortOrders, transitionPatch, type OrderAction, type TimeValue } from '../domain/orderStatus';
 import { db } from '../firebase/staff';
 import { AppError, toAppError } from './errors';
@@ -37,6 +38,7 @@ export function toOrder(snap: DocumentSnapshot): Order {
     items: (d.items as OrderLine[]).map((i) => ({ menuId: i.menuId, name: i.name, price: i.price, qty: i.qty })),
     total: d.total,
     payment: d.payment,
+    note: typeof d.note === 'string' ? d.note : '', // 無い注文（#40 より前）は、空
     status: d.status,
     cancelledFrom: d.cancelledFrom ?? null,
     qr: d.qr === true,
@@ -83,6 +85,7 @@ async function confirmOnce(eventId: string, ctx: ConfirmContext, uid: string): P
   const orderRef = doc(ordersCol(eventId), ctx.orderId);
   const counterRef = doc(db, 'events', eventId, 'counters', ctx.day);
   const { items, total, payment, qr } = ctx.draft;
+  const note = ctx.draft.note ?? ''; // 古い pending（メモの項目なし）は、空
   const lines = items.map((i) => ({ menuId: i.menuId, name: i.name, price: i.price, qty: i.qty }));
   try {
     const result = await runTransaction(db, async (tx) => {
@@ -97,6 +100,7 @@ async function confirmOnce(eventId: string, ctx: ConfirmContext, uid: string): P
         items: lines,
         total,
         payment,
+        note,
         status: qr ? 'preparing' : 'done',
         cancelledFrom: null,
         qr,
@@ -119,6 +123,7 @@ async function confirmOnce(eventId: string, ctx: ConfirmContext, uid: string): P
       items: lines,
       total,
       payment,
+      note,
       status: qr ? 'preparing' : 'done',
       cancelledFrom: null,
       qr,
@@ -252,6 +257,17 @@ export function transitionOrder(eventId: string, order: Pick<Order, 'id' | 'stat
 /** 支払い方法の変更（現金とPayPayの取り違えの訂正。状態は変えない）。オフラインでも受け付ける */
 export function changePayment(eventId: string, orderId: string, payment: Payment, uid: string): Promise<void> {
   return updateDoc(doc(ordersCol(eventId), orderId), { payment, updatedBy: uid, updatedAt: serverTimestamp() }).catch((e: unknown) => {
+    throw toAppError(e);
+  });
+}
+
+/**
+ * メモの変更（確定後も、調理画面のカードから。SPEC 4.3）。note は、normalizeNote 済みのもの（空にもできる）。
+ * 状態は変えない。オフラインでも受け付ける。複数人が同時に直したときは、後から届いた方が勝つ
+ */
+export function changeNote(eventId: string, orderId: string, note: string, uid: string): Promise<void> {
+  if (note.length > NOTE_MAX) return Promise.reject(validationError(`メモは${NOTE_MAX}文字までです`));
+  return updateDoc(doc(ordersCol(eventId), orderId), { note, updatedBy: uid, updatedAt: serverTimestamp() }).catch((e: unknown) => {
     throw toAppError(e);
   });
 }

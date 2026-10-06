@@ -13,9 +13,11 @@ type Props = {
   onAction: (order: Order, action: OrderAction) => void;
   onTogglePayment: (order: Order) => void;
   onQr: (order: Order) => void;
+  /** メモの修正（#40） */
+  onEditNote: (order: Order) => void;
 };
 
-export function OrderCard({ order, today, now, onAction, onTogglePayment, onQr }: Props) {
+export function OrderCard({ order, today, now, onAction, onTogglePayment, onQr, onEditNote }: Props) {
   const finished = order.status === 'done' || order.status === 'cancelled';
   const mark = dayMark(order.day, today);
   const [main, ...rest] = availableActions(order.status);
@@ -44,6 +46,13 @@ export function OrderCard({ order, today, now, onAction, onTogglePayment, onQr }
           </li>
         ))}
       </ul>
+      {/* メモ：調理で気をつけることを、見落とさないように目立たせる（色だけでなく、「メモ」の文字でも示す） */}
+      {order.note && (
+        <p class={styles.note}>
+          <span class={styles.noteLabel}>メモ</span>
+          <span class={styles.noteText}>{order.note}</span>
+        </p>
+      )}
       <div class={styles.total}>
         <span>合計</span>
         <span>{formatYen(order.total)}</span>
@@ -66,6 +75,9 @@ export function OrderCard({ order, today, now, onAction, onTogglePayment, onQr }
               QR
             </Button>
           )}
+          <Button variant="secondary" onClick={() => onEditNote(order)}>
+            {order.note ? 'メモを直す' : 'メモを足す'}
+          </Button>
           <Button variant="secondary" onClick={() => onTogglePayment(order)} aria-label={`支払いを${next[order.payment]}に変更`}>
             {next[order.payment]}に変更
           </Button>

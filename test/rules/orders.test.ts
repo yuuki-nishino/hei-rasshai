@@ -124,6 +124,26 @@ describe('注文の作成', () => {
     await assertFails(confirm(as(env, ALICE), 'o2', newOrder(ALICE, 2, true, patch), 2));
   });
 
+  describe('メモ（#40）の作成', () => {
+    it('メモなし・メモが空・メモあり（100文字ちょうど）は作れる', async () => {
+      await assertSucceeds(confirm(as(env, ALICE), 'o2', newOrder(ALICE, 2), 2)); // note の項目なし（古い形）
+      await assertSucceeds(confirm(as(env, ALICE), 'o3', newOrder(ALICE, 3, true, { note: '' }), 3));
+      await assertSucceeds(confirm(as(env, ALICE), 'o4', newOrder(ALICE, 4, true, { note: '辛さ抜き' }), 4));
+      await assertSucceeds(confirm(as(env, ALICE), 'o5', newOrder(ALICE, 5, true, { note: 'あ'.repeat(100) }), 5));
+    });
+
+    it.each([
+      ['101文字', { note: 'あ'.repeat(101) }],
+      ['絵文字は2文字と数える（51個で102）', { note: '🍜'.repeat(51) }],
+      ['数値', { note: 123 }],
+      ['真偽値', { note: true }],
+      ['null', { note: null }],
+      ['リスト', { note: ['辛さ抜き'] }],
+    ])('拒否：%s', async (_label, patch) => {
+      await assertFails(confirm(as(env, ALICE), 'o2', newOrder(ALICE, 2, true, patch), 2));
+    });
+  });
+
   it('9：items が50行なら許可（境界）', async () => {
     const items = Array.from({ length: 50 }, (_, i) => ({ ...orderItems[0], menuId: `m${i}` }));
     await assertSucceeds(confirm(as(env, ALICE), 'o2', newOrder(ALICE, 2, true, { items }), 2));
@@ -240,6 +260,59 @@ describe('注文の更新', () => {
     const db = as(env, ALICE);
     await assertSucceeds(updateDoc(doc(db, 'events/e1/orders/o1'), upd(ALICE, { payment: 'paypay' })));
     await assertFails(updateDoc(doc(db, 'events/e1/orders/o1'), upd(ALICE, { payment: 'card' })));
+  });
+
+  describe('メモ（#40）の更新：確定後も、メンバーが変更できる', () => {
+    it('メモを足す・変える・空にする（支払い方法の変更と同じく、updatedBy・updatedAt と一緒に）', async () => {
+      const ref = doc(as(env, ALICE), 'events/e1/orders/o1');
+      await assertSucceeds(updateDoc(ref, upd(ALICE, { note: '辛さ抜き' })));
+      await assertSucceeds(updateDoc(ref, upd(ALICE, { note: 'ネギ抜き' })));
+      await assertSucceeds(updateDoc(ref, upd(ALICE, { note: '' })));
+      await assertSucceeds(updateDoc(ref, upd(ALICE, { note: 'あ'.repeat(100) })));
+    });
+
+    it('お渡し済み・取り消しの注文のメモも変えられる。状態の変更と同時でもよい', async () => {
+      await seedOrder('d', { status: 'done', doneAt: new Date(0), qr: false });
+      await assertSucceeds(updateDoc(doc(as(env, ALICE), 'events/e1/orders/d'), upd(ALICE, { note: '渡し済み' })));
+      await seedOrder('c', { status: 'cancelled', cancelledFrom: 'ready', cancelledAt: new Date(0) });
+      await assertSucceeds(updateDoc(doc(as(env, ALICE), 'events/e1/orders/c'), upd(ALICE, { note: '取り消し済み' })));
+      await assertSucceeds(updateDoc(doc(as(env, ALICE), 'events/e1/orders/o1'), upd(ALICE, { note: '完成と同時', status: 'ready', readyAt: serverTimestamp() })));
+    });
+
+    it.each([
+      ['101文字', { note: 'あ'.repeat(101) }],
+      ['絵文字は2文字と数える', { note: '🍜'.repeat(51) }],
+      ['数値', { note: 5 }],
+      ['null', { note: null }],
+      ['リスト', { note: ['a'] }],
+    ])('拒否：%s', async (_label, patch) => {
+      await assertFails(updateDoc(doc(as(env, ALICE), 'events/e1/orders/o1'), upd(ALICE, patch)));
+    });
+
+    it('メモと一緒に、品目・合計・番号を書き換えるのは拒否（メモだけが、新しく変えられる）', async () => {
+      const ref = doc(as(env, ALICE), 'events/e1/orders/o1');
+      await assertFails(updateDoc(ref, upd(ALICE, { note: 'x', total: 1 })));
+      await assertFails(updateDoc(ref, upd(ALICE, { note: 'x', items: [{ ...orderItems[0], qty: 3 }] })));
+      await assertFails(updateDoc(ref, upd(ALICE, { note: 'x', number: 99 })));
+    });
+
+    it('updatedBy が自分でない・updatedAt がクライアントの時刻なら、メモの更新も拒否（R11）', async () => {
+      const ref = doc(as(env, ALICE), 'events/e1/orders/o1');
+      await assertFails(updateDoc(ref, { note: 'x', updatedBy: OWNER, updatedAt: serverTimestamp() }));
+      await assertFails(updateDoc(ref, { note: 'x', updatedBy: ALICE, updatedAt: new Date() }));
+    });
+
+    it('非メンバー・別のイベントのメンバー・未ログインは、メモを変えられない', async () => {
+      for (const db of [as(env, BOB), as(env, CAROL), anon(env)]) {
+        await assertFails(updateDoc(doc(db, 'events/e1/orders/o1'), upd(ALICE, { note: 'x' })));
+      }
+    });
+
+    it('メモの無い古い注文に、メモを足せる。古い注文（メモなし）の、ほかの更新は、これまでどおり', async () => {
+      const ref = doc(as(env, ALICE), 'events/e1/orders/o1'); // storedOrder は、メモの項目なし
+      await assertSucceeds(updateDoc(ref, upd(ALICE, { payment: 'paypay' })));
+      await assertSucceeds(updateDoc(ref, upd(ALICE, { note: '後から足したメモ' })));
+    });
   });
 
   // 遷移表（data-model.md §3）。表にないもの以外は、すべて許可

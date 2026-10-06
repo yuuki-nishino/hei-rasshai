@@ -26,7 +26,7 @@
 |---|---|
 | `orderId` | 確定ボタンを押した時点で生成（`doc(collection(...)).id`）。**再試行で使い回す** |
 | `day` | 確定ボタンを押した時点の `toDay(now)`。再試行でも変えない |
-| `draft` | カートの内容（`items`、`total`、`payment`、`qr`）。確定ボタンの時点で固定する |
+| `draft` | カートの内容（`items`、`total`、`payment`、`qr`、`note`）。確定ボタンの時点で固定する。`note`（メモ。#40）が無い、古い `pending` の記録は、空として扱う |
 | `pending` | `localStorage` の `hei:pending:{eventId}` に保存する。`{ orderId, day, draft, abandoning }`。**トランザクションを始める前に保存する**。`abandoning` は、「やめる」を選んだときに、**`voidOrFind` を始める前に** `true` にして保存する |
 
 - `pending` は、イベントにつき**1件だけ**。**`pending` がある間は、新しい注文を確定できない**（確定ボタンを無効にし、「前の注文の確認中です」を表示する）
