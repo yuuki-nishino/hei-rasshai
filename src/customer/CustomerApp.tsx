@@ -8,8 +8,10 @@ import {
   CUSTOMER_STATUS_TEXT,
   customerView,
   formatClock,
+  isWaiting,
   parseOrderLink,
   shouldVibrate,
+  startWaitTicker,
   type CustomerOrder,
   type CustomerSnapshot,
   type CustomerStatus,
@@ -24,6 +26,8 @@ export function CustomerApp() {
   const [snapshot, setSnapshot] = useState<CustomerSnapshot | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [waitedMs, setWaitedMs] = useState(0);
+  const [startedAt] = useState(Date.now); // 開いた時刻（読み込みの待ちの起点）
+  const [lastOrder, setLastOrder] = useState<CustomerOrder | null>(null);
 
   useEffect(() => {
     if (!link) return;
@@ -35,19 +39,20 @@ export function CustomerApp() {
         // 「できあがり」に変わった瞬間だけ振動する（対応する端末のみ。iPhone は非対応）
         if (shouldVibrate(prev, s.order.status)) navigator.vibrate?.([200, 100, 200]);
         prev = s.order.status;
+        setLastOrder(s.order); // エラーのあとも、カードを残すため
       }
     });
   }, [link]);
 
-  // 読み込み中が続く時間を数える（8秒で「通信が不安定です」を添える）
+  // 読み込み中が続く時間を数える（8秒で「通信が不安定です」を添える）。
+  // 条件は、結果が届いたかではなく、「読み込み中と判定されているか」（オフラインで、キャッシュだけの結果が届いても、数え続ける。PR #44 のレビュー V1）
+  const waiting = link !== null && isWaiting(snapshot);
   useEffect(() => {
-    if (snapshot) return;
-    const start = Date.now();
-    const id = setInterval(() => setWaitedMs(Date.now() - start), 1000);
-    return () => clearInterval(id);
-  }, [snapshot]);
+    if (!waiting) return;
+    return startWaitTicker(startedAt, setWaitedMs);
+  }, [waiting, startedAt]);
 
-  const view = link ? customerView(snapshot, waitedMs) : null;
+  const view = link ? customerView(snapshot, waitedMs, lastOrder) : null;
 
   // タブの題名にも、番号と状況を出す（ほかのアプリに切り替えても、分かるように）
   const activeNumber = view?.state === 'active' ? view.order.number : null;

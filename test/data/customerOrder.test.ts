@@ -103,16 +103,16 @@ describe('watchOrder（お客様）', () => {
     expect(customerView(snap, 0)).toEqual({ state: 'notFound' });
   });
 
-  it('存在しない注文でも、キャッシュの結果（fromCache = true）の間は、notFound と判定しない', () => {
-    // 判定は、純粋関数 customerView で確かめている（test/domain/customerView.test.ts）。ここでは、本物の購読の最初の結果の形を確かめる
-    setCustomer();
+  it('つながらない（オフライン）とき、存在しない注文は、キャッシュの結果（fromCache = true・文書なし）になる。notFound と判定せず、loading のまま（PR #44 のレビュー V3）', async () => {
+    setCustomer(9); // つながらない宛先（Emulator がいない）
     const w = watch('e1', 'nonexistent00000000');
-    return waitFor(() => w.seen[0]).then((first) => {
-      w.unsub();
-      if (first.kind === 'doc' && !first.order && first.fromCache) expect(customerView(first, 0).state).toBe('loading');
-      else expect(['loading', 'notFound']).toContain(customerView(first, 0).state);
-    });
-  });
+    // つながらないまま、SDK は、キャッシュだけの結果を返す（接続の試行がしばらく続いた後）
+    const first = await waitFor(() => w.seen.find((s) => s.kind === 'doc'), 20_000);
+    w.unsub();
+    expect(first).toEqual({ kind: 'doc', order: null, fromCache: true });
+    expect(customerView(first, 0)).toEqual({ state: 'loading', slow: false }); // notFound にしない
+    expect(customerView(first, 9000)).toEqual({ state: 'loading', slow: true });
+  }, 30_000);
 
   it('注文の一覧（list）は、お客様には読めない（ルール）', async () => {
     const db = setCustomer();

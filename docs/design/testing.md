@@ -150,6 +150,7 @@
 - #15 の結果：9 を `test/data/orders.test.ts` で確認した（全遷移でデータ設計の項目がそのとおりに書かれ、ルールを通る。できない遷移は書く前に拒否。他のメンバーが先に取り消した後の古い画面からの操作は、ルールが拒否する。支払い変更は、お渡し済み・取り消しにも効く。購読は、(day, number) の昇順・状態の絞り込み・他のメンバーの操作の反映）。遷移の判定は、`test/domain/orderStatus.test.ts` で、状態×操作の全24通りを確かめた
 - #40 の結果：メモを、`test/data/orders.test.ts` で確認した（確定でメモが保存される・メモなし、同じ `orderId` の再確定でも二重にならずメモも最初のまま、メモの項目が無い古い `pending`・古い注文を読める、`changeNote` で足す・変える・空にする〔状態・品目・合計は変わらない〕、お渡し済み・取り消しも変えられる、101文字・メンバー以外は拒否、ほかのメンバーの修正が購読に届く、オフラインで受け付け、つながると届く）。ルールのテストは `test/rules/orders.test.ts`（17a）。メモの整形は、単体テスト（`test/domain/note.test.ts`）
 - #16 の結果：`customerView`（screens.md §4.1 の表の全行。`!exists && fromCache` は loading・8秒で slow）、`shouldVibrate`（調理中 → できあがりだけ。最初の表示では、しない）、`parseOrderLink`、状況ごとの文言を、単体テスト（`test/domain/customerView.test.ts`）で確認した。`watchOrder` は、**未ログインの利用者**で、本物のルールの下で、`test/data/customerOrder.test.ts` で確認した（注文1件を読める・お客様に渡す項目に支払い方法・メモ・uid を含まない・スタッフの操作が届く・存在しない注文は、サーバーの結果で notFound・一覧〔list〕は拒否される）。お客様画面は、Emulator につないで、調理中 → できあがり（振動が1回）→ お渡し済み（振動なし）・存在しない注文・不正なリンクを確かめた。バンドルの大きさは、ビルドで検査する（約135KB）
+- #16 のレビュー対応：`isWaiting`・`startWaitTicker` と `customerView` の組み合わせ（オフラインで、キャッシュだけの結果が届いても、8秒で slow）を偽のタイマーで、つながらない宛先で、存在しない注文の最初の結果が `fromCache: true`・文書なしになること（notFound にしない）を結合テストで確かめた（`setCustomer(9)`）
 - #7 で分かったこと：ルールの文字数は UTF-16 の単位（絵文字は2文字）。画面の検査と `displayName` の切り詰めを、これに合わせた（data-model.md §2）
 
 ## 5. 実機の確認（手動）

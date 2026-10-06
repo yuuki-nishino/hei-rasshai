@@ -79,10 +79,10 @@ function openUser(uid: string, port: number): Firestore {
  */
 export const customerHolder: { db: Firestore | null } = { db: null };
 
-export function setCustomer(): Firestore {
+export function setCustomer(port = 8080): Firestore {
   const app = initializeApp({ projectId, apiKey: 'demo' }, `customer-${++seq}`);
   const db = initializeFirestore(app, { localCache: memoryLocalCache() });
-  connectFirestoreEmulator(db, '127.0.0.1', 8080); // mockUserToken なし＝未ログイン
+  connectFirestoreEmulator(db, '127.0.0.1', port); // mockUserToken なし＝未ログイン
   opened.push({ app, db });
   customerHolder.db = db;
   return db;

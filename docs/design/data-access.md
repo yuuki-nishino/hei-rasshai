@@ -112,7 +112,7 @@ type OrderAction = 'ready' | 'backToPreparing' | 'done' | 'backToReady' | 'cance
 ### 3.6 customerOrder.ts（お客様用。別モジュール）
 | 関数 | 内容 |
 |---|---|
-| `watchOrder(eventId, orderId, cb: (s: CustomerSnapshot) => void): Unsubscribe` | 注文1件の購読。`includeMetadataChanges: true`。`CustomerSnapshot` は、`{ kind: 'doc', order: CustomerOrder \| null, fromCache }` か `{ kind: 'error' }`。`CustomerOrder` は、番号・状況・明細・合計だけ（支払い方法・メモ・スタッフの情報は、取り出さない）。判定は、純粋関数 `customerView`（screens.md §4.1）。お客様用の `lib/firebase/customer.ts` だけを使い、スタッフ用のコードを import しない（eslint とビルドで検査） |
+| `watchOrder(eventId, orderId, cb: (s: CustomerSnapshot) => void): Unsubscribe` | 注文1件の購読。`includeMetadataChanges: true`。`CustomerSnapshot` は、`{ kind: 'doc', order: CustomerOrder \| null, fromCache }` か `{ kind: 'error' }`。`CustomerOrder` は、番号・状況・明細・合計だけ（支払い方法・メモ・スタッフの情報は、取り出さない）。判定は、純粋関数 `customerView`（screens.md §4.1）。お客様用の `lib/firebase/customer.ts` だけを使い、スタッフ用のコードを import しない（eslint とビルドで検査）。購読が終わった（エラー）ときは、`{ kind: 'error' }` を渡し、間隔を空けて（2秒〜30秒）つなぎ直す |
 
 ### 3.7 closings.ts
 | 関数 | 内容 |

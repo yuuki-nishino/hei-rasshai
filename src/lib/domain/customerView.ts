@@ -24,16 +24,28 @@ export type CustomerView =
 /** 読み込み中が、この時間続いたら、「通信が不安定です」を添える（screens.md §4.1） */
 export const SLOW_AFTER_MS = 8000;
 
+/** 読み込み中か（待ちの時間を数えるかの判定）。送られてきた結果の有無ではなく、判定の結果で決める（PR #44 のレビュー V1） */
+export function isWaiting(snapshot: CustomerSnapshot | null): boolean {
+  return customerView(snapshot, 0).state === 'loading';
+}
+
+/** 待ちの時間を、intervalMs ごとに知らせる（開始時刻からの経過）。止める関数を返す */
+export function startWaitTicker(startedAt: number, onTick: (waitedMs: number) => void, intervalMs = 1000): () => void {
+  const id = setInterval(() => onTick(Date.now() - startedAt), intervalMs);
+  return () => clearInterval(id);
+}
+
 /**
  * - まだ何も届いていない → loading
  * - 文書が無く、サーバーの結果（fromCache = false）→ notFound
  * - 文書が無く、キャッシュの結果（fromCache = true。オフライン）→ **notFound にしない**。loading（8秒続いたら slow）
- * - エラー → error
+ * - エラー → error（表示していた注文があれば、それを残して active ＝「通信が不安定です」）
  * - 文書がある → active（fromCache が続くときは、「通信が不安定です」を出す）
  */
-export function customerView(snapshot: CustomerSnapshot | null, waitedMs: number): CustomerView {
+export function customerView(snapshot: CustomerSnapshot | null, waitedMs: number, last: CustomerOrder | null = null): CustomerView {
   if (!snapshot) return { state: 'loading', slow: waitedMs >= SLOW_AFTER_MS };
-  if (snapshot.kind === 'error') return { state: 'error' };
+  // 表示していた注文があるときは、エラーでもカードを残し、「通信が不安定です」を出す（購読は、つなぎ直す。PR #44 のレビュー V2）
+  if (snapshot.kind === 'error') return last ? { state: 'active', order: last, fromCache: true } : { state: 'error' };
   if (snapshot.order) return { state: 'active', order: snapshot.order, fromCache: snapshot.fromCache };
   return snapshot.fromCache ? { state: 'loading', slow: waitedMs >= SLOW_AFTER_MS } : { state: 'notFound' };
 }
