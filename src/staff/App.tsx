@@ -37,12 +37,14 @@ import { ClosingPage } from './closing/ClosingPage';
 import { KitchenPage } from './kitchen/KitchenPage';
 import { OrderPage } from './order/OrderPage';
 import { InvitePanel } from './members/InvitePanel';
+import { SalesPage } from './sales/SalesPage';
 import { MembersPanel } from './members/MembersPanel';
 
 // イベントの中の画面。タブ（注文・メニュー・イベント）。Shell（接続状態など）と、ほかのタブは、後のIssueで足す（screens.md §1.2）
 const TAB_LABELS: { id: TabId; label: string }[] = [
   { id: 'order', label: '注文' },
   { id: 'kitchen', label: '調理' },
+  { id: 'sales', label: '売上' },
   { id: 'closing', label: 'レジ締め' },
   { id: 'menu', label: 'メニュー' },
   { id: 'event', label: 'イベント' },
@@ -88,6 +90,7 @@ function EventHome() {
         <div class={styles.main} id="tab-panel" role="tabpanel" aria-labelledby={tabId(tab)}>
           {tab === 'order' && eventId && <OrderPage eventId={eventId} />}
           {tab === 'kitchen' && eventId && uid && <KitchenPage eventId={eventId} uid={uid} />}
+          {tab === 'sales' && eventId && <SalesPage eventId={eventId} />}
           {tab === 'closing' && eventId && uid && <ClosingPage eventId={eventId} uid={uid} />}
           {tab === 'menu' && eventId && <MenuPage eventId={eventId} />}
           {tab === 'event' && (

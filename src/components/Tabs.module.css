@@ -20,7 +20,7 @@
   background: transparent;
   color: var(--color-ink-sub);
   font-family: var(--font-hand);
-  font-size: clamp(0.8125rem, 3.8vw, var(--fs-lg));
+  font-size: clamp(0.75rem, 3.3vw, var(--fs-lg));
   white-space: nowrap;
   cursor: pointer;
 }

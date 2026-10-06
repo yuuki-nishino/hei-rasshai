@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDocFromServer,
+  getDocs,
   getDocsFromServer,
   onSnapshot,
   query,
@@ -285,5 +286,18 @@ export async function fetchOrdersOfDayFromServer(eventId: string, day: string): 
   } catch (e) {
     const err = toAppError(e);
     throw err.code === 'timeout' ? new AppError('offline', { cause: e }) : err;
+  }
+}
+
+/**
+ * その日の注文を取得する（売上用。`getDocs`：通信できればサーバー、できなければキャッシュ）。
+ * `fromCache` が true のとき、一部の注文が欠けている可能性がある（画面に警告を出す）。常時購読はしない
+ */
+export async function fetchOrdersOfDay(eventId: string, day: string): Promise<{ orders: Order[]; fromCache: boolean }> {
+  try {
+    const snap = await getDocs(query(ordersCol(eventId), where('day', '==', day)));
+    return { orders: sortOrders(snap.docs.map(toOrder)), fromCache: snap.metadata.fromCache };
+  } catch (e) {
+    throw toAppError(e);
   }
 }
