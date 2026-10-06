@@ -4,23 +4,24 @@
   gap: var(--sp-1);
   max-width: 960px;
   margin-inline: auto;
-  padding-inline: var(--sp-4);
+  padding-inline: var(--sp-2);
   border-bottom: 2px solid var(--color-line);
   overflow-x: auto;
 }
 
 .tab {
   flex: 1;
-  min-width: 5em;
+  min-width: 0;
   min-height: var(--tap-min);
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) 2px;
   border: none;
   border-bottom: 4px solid transparent;
   margin-bottom: -2px;
   background: transparent;
   color: var(--color-ink-sub);
   font-family: var(--font-hand);
-  font-size: var(--fs-lg);
+  font-size: clamp(0.8125rem, 3.8vw, var(--fs-lg));
+  white-space: nowrap;
   cursor: pointer;
 }
 

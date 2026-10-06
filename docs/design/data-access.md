@@ -95,7 +95,7 @@ type Unsubscribe = () => void;
 | `watchActiveOrders(eventId, cb: (orders: Order[], meta: { fromCache: boolean }) => void, onError): Unsubscribe` | `status in [preparing, ready]`。`includeMetadataChanges: true`。**Shell の階層で、イベントを選んでいる間は、常に購読する**（接続状態の判定と、調理画面で共有） |
 | `watchOrdersOfDay(eventId, day, cb, onError): Unsubscribe` | 調理画面の「済みも表示」用（全状態）。`watchActiveOrders` と同じ形（`(day, number)` の昇順・`includeMetadataChanges`） |
 | `fetchOrdersOfDay(eventId, day): Promise<{ orders: Order[]; fromCache: boolean }>` | 売上用（`getDocs`）。`fromCache` が `true` なら、画面に警告を出す |
-| `fetchOrdersOfDayFromServer(eventId, day): Promise<Order[]>` | レジ締め用（`getDocsFromServer`）。オフラインなら `AppError('offline')` |
+| `fetchOrdersOfDayFromServer(eventId, day): Promise<Order[]>` | レジ締め用（`getDocsFromServer`。`(day, number)` の昇順）。オフラインなら `AppError('offline')`。8秒で応答がなければ、同じく offline（キャッシュを返さない） |
 | `transitionOrder(eventId, order, action: OrderAction, uid): Promise<void>` | 下記。`updateDoc`（オフラインでも受け付ける） |
 | `changePayment(eventId, orderId, payment, uid): Promise<void>` | |
 | `changeNote(eventId, orderId, note, uid): Promise<void>` | メモの変更（#40）。`note` は `normalizeNote`（`lib/domain/note.ts`：改行は空白に、前後の空白を除く。100文字まで）済みのもの。空にもできる。101文字以上は、書く前に `AppError('validation')`。`changePayment` と同じく、オフラインでも受け付ける（`trackWrite` の対象にするのは #19）。同時に直したときは、後から届いた方が勝つ |
@@ -117,8 +117,8 @@ type OrderAction = 'ready' | 'backToPreparing' | 'done' | 'backToReady' | 'cance
 ### 3.7 closings.ts
 | 関数 | 内容 |
 |---|---|
-| `getClosing(eventId, day): Promise<Closing \| null>` | |
-| `saveClosing(eventId, day, input, uid): Promise<void>` | **オンライン必須**（§3.9）。`expectedCash` と `diff` は、画面の計算値を書く。**呼び出す側が、`fetchOrdersOfDayFromServer` で集計した値を渡す**（部分的なキャッシュで締めないため） |
+| `getClosing(eventId, day): Promise<Closing \| null>` | **サーバーから**取得する（`getDocFromServer`。キャッシュを使わない）。締め済みかどうか・「締め後に変更あり」の判定が、古い値にならないように。通信できなければ `AppError('offline')` |
+| `saveClosing(eventId, day, input, uid): Promise<void>` | **オンライン必須**（§3.9。`assertOnline` の後に、8秒で打ち切る `withTimeout` で書く）。`input` は `{ floatCash, expectedCash, actualCash, note }`。**`expectedCash` は、呼び出す側が、`fetchOrdersOfDayFromServer` で集計した値から計算して渡す**（部分的なキャッシュで締めないため）。`diff` は、ここで `actualCash − expectedCash` を計算して書く（ルールが、この式を検査する）。不正な入力（小数・負・上限超え・201文字のメモ）は、書く前に `AppError('validation')` |
 
 ### 3.8 domain（純粋関数）
 | 関数 | 内容 |

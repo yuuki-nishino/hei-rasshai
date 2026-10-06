@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDocFromServer,
+  getDocsFromServer,
   onSnapshot,
   query,
   runTransaction,
@@ -18,6 +19,7 @@ import { NOTE_MAX } from '../domain/note';
 import { sortOrders, transitionPatch, type OrderAction, type TimeValue } from '../domain/orderStatus';
 import { db } from '../firebase/staff';
 import { AppError, toAppError } from './errors';
+import { withTimeout } from './online';
 import type { Order, OrderLine, Payment, Unsubscribe } from './types';
 
 const ordersCol = (eventId: string) => collection(db, 'events', eventId, 'orders');
@@ -270,4 +272,18 @@ export function changeNote(eventId: string, orderId: string, note: string, uid: 
   return updateDoc(doc(ordersCol(eventId), orderId), { note, updatedBy: uid, updatedAt: serverTimestamp() }).catch((e: unknown) => {
     throw toAppError(e);
   });
+}
+
+/**
+ * その日の注文を、**サーバーから**取得する（レジ締め用。キャッシュを使わない）。
+ * 部分的なキャッシュで締めないため、通信できなければ AppError('offline')（8秒で応答がなければ、同じく offline）
+ */
+export async function fetchOrdersOfDayFromServer(eventId: string, day: string): Promise<Order[]> {
+  try {
+    const snap = await withTimeout(getDocsFromServer(query(ordersCol(eventId), where('day', '==', day))));
+    return sortOrders(snap.docs.map(toOrder));
+  } catch (e) {
+    const err = toAppError(e);
+    throw err.code === 'timeout' ? new AppError('offline', { cause: e }) : err;
+  }
 }
