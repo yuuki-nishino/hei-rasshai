@@ -5,8 +5,10 @@
   max-width: 960px;
   margin-inline: auto;
   padding-inline: var(--sp-2);
-  border-bottom: 2px solid var(--color-line);
+  /* 下の線は、枠ではなく内側の影で描く（選んだタブの下線を、負の余白で重ねると、縦のスクロールバーが出るため） */
+  box-shadow: inset 0 -2px 0 var(--color-line);
   overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .tab {
@@ -16,7 +18,6 @@
   padding: var(--sp-2) 2px;
   border: none;
   border-bottom: 4px solid transparent;
-  margin-bottom: -2px;
   background: transparent;
   color: var(--color-ink-sub);
   font-family: var(--font-hand);

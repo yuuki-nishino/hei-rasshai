@@ -56,6 +56,11 @@ describe('buildCsv', () => {
     expect(csv).toContain(`"'-焼き×1"`); // 品目のセルは、先頭が - なので無害化される
   });
 
+  it('0時台の時刻は、「00:05:00」（24 を使わない）', () => {
+    const csv = buildCsv([{ ...base, createdAt: at(0, 5, 0) }]);
+    expect(csv).toContain('"00:05:00"');
+  });
+
   it('1000番以上でも、そのまま出す', () => {
     expect(buildCsv([{ ...base, number: 1234 }])).toContain('"2026-08-01","1234"');
   });

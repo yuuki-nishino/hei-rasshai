@@ -169,13 +169,14 @@ export function SalesPage({ eventId }: { eventId: string }) {
               )}
 
               <div class={styles.actions}>
-                <Button variant="secondary" onClick={() => void copy()}>
+                <Button variant="secondary" disabled={loaded.fromCache} onClick={() => void copy()}>
                   集計をコピー
                 </Button>
-                <Button variant="secondary" onClick={saveCsv}>
+                <Button variant="secondary" disabled={loaded.fromCache} onClick={saveCsv}>
                   CSV保存
                 </Button>
               </div>
+              {loaded.fromCache && <p class={styles.hint}>欠けた集計を持ち出さないよう、通信が戻って「更新」するまで、コピーとCSV保存はできません</p>}
 
               {manualText !== null && (
                 <div class={styles.panel}>
