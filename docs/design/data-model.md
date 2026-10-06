@@ -243,8 +243,8 @@ erDiagram
 
 | 操作 | 遷移 | 書き換える項目 |
 |---|---|---|
-| 確定（QRあり） | → preparing | 作成時に、`cancelledFrom = null`, `readyAt = doneAt = cancelledAt = null` |
-| 確定（QRなし） | → done | 作成時に、`doneAt = serverTimestamp`、他の時刻は `null` |
+| 確定（QRあり） | → preparing | 作成時に、`cancelledFrom = null`, `readyAt = doneAt = cancelledAt = null`、`note` は入力したメモ（無ければ空の文字列） |
+| 確定（QRなし） | → done | 作成時に、`doneAt = serverTimestamp`、他の時刻は `null`、`note` は入力したメモ（無ければ空の文字列） |
 | 完成 | preparing → ready | `readyAt = now` |
 | 調理中に戻す | ready → preparing | `readyAt = null` |
 | 渡した | ready → done | `doneAt = now` |

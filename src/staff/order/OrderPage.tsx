@@ -80,7 +80,7 @@ export function OrderPage({ eventId }: { eventId: string }) {
         label="メモ（任意）"
         placeholder="例：辛さ抜き"
         maxLength={NOTE_MAX}
-        hint="調理画面に出ます。お客様に見られることがあるので、個人の名前などは書かないでください"
+        hint="調理画面に出ます（お客様の画面には出ません）。個人の名前など、個人情報は書かないでください"
         value={noteText.value}
         error={normalizeNote(noteText.value) === null ? `メモは${NOTE_MAX}文字までです` : null}
         onInput={(e) => setNote(e.currentTarget.value)}

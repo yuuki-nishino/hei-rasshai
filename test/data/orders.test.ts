@@ -435,7 +435,9 @@ describe('メモ（#40）', () => {
     setUser(ALICE);
     const id = newOrderId('e1');
     await confirmOrder('e1', { ...withNote('x'), orderId: id, draft: { ...ctxOf('x').draft, qr: false, note: 'x' } }, ALICE);
+    expect((await rawOrder(id)).status).toBe('done'); // QRなしの確定は、お渡し済み（PR #43 のレビュー N1：状態を明示する）
     await changeNote('e1', id, '渡し済みのメモ', ALICE);
+    expect(await rawOrder(id)).toMatchObject({ status: 'done', note: '渡し済みのメモ' });
     await transitionOrder('e1', (await findOrderOnServer('e1', id))!, 'cancel', ALICE);
     await changeNote('e1', id, '取り消し後のメモ', ALICE);
     expect(await rawOrder(id)).toMatchObject({ note: '取り消し後のメモ', status: 'cancelled' });

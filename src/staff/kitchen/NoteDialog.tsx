@@ -51,7 +51,7 @@ export function NoteDialog({ order, onSave, onClose }: Props) {
             label="メモ"
             placeholder="例：辛さ抜き"
             maxLength={NOTE_MAX}
-            hint="空にすると、メモが消えます。お客様に見られることがあるので、個人の名前などは書かないでください"
+            hint="空にすると、メモが消えます。お客様の画面には出ません。個人の名前など、個人情報は書かないでください"
             value={text}
             error={normalized === null ? `メモは${NOTE_MAX}文字までです` : null}
             onInput={(e: TargetedEvent<HTMLInputElement>) => setText(e.currentTarget.value)}
