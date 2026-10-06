@@ -14,7 +14,7 @@ vi.mock('../../src/lib/firebase/staff', async () => {
   };
 });
 
-const { changePayment, confirmOrder, fetchOrdersOfDayFromServer, newOrderId, transitionOrder, findOrderOnServer } = await import('../../src/lib/data/orders');
+const { changePayment, confirmOrder, fetchOrdersOfDay, fetchOrdersOfDayFromServer, newOrderId, transitionOrder, findOrderOnServer } = await import('../../src/lib/data/orders');
 const { getClosing, saveClosing } = await import('../../src/lib/data/closings');
 const { calcExpectedCash, closingView, summarize } = await import('../../src/lib/domain');
 type ConfirmContext = import('../../src/lib/domain/confirmFlow').ConfirmContext;
@@ -52,6 +52,29 @@ const yaki = (qty: number) => [{ menuId: 'y', name: '焼きそば', price: 500, 
 async function aggregate(day = DAY) {
   return summarize(await fetchOrdersOfDayFromServer('e1', day));
 }
+
+describe('fetchOrdersOfDay（売上用）', () => {
+  it('その日の注文を、取り消しも含めて、(day, number) の順に返す。通信できるので fromCache は false', async () => {
+    setUser(ALICE);
+    const a = ctxOf(DAY, yaki(1), 'cash');
+    await confirmOrder('e1', a, ALICE);
+    await confirmOrder('e1', ctxOf(DAY, yaki(2), 'paypay'), ALICE);
+    await confirmOrder('e1', ctxOf('2026-08-02', yaki(9), 'cash'), ALICE);
+    await transitionOrder('e1', (await findOrderOnServer('e1', a.orderId))!, 'cancel', ALICE);
+    const r = await fetchOrdersOfDay('e1', DAY);
+    expect(r.fromCache).toBe(false);
+    expect(r.orders.map((o) => [o.number, o.status])).toEqual([
+      [1, 'cancelled'],
+      [2, 'preparing'],
+    ]);
+    expect(summarize(r.orders)).toMatchObject({ grandCount: 1, paypayTotal: 1000 });
+  });
+
+  it('注文が無い日は、空', async () => {
+    setUser(ALICE);
+    expect(await fetchOrdersOfDay('e1', '2026-08-03')).toEqual({ orders: [], fromCache: false });
+  });
+});
 
 describe('fetchOrdersOfDayFromServer（レジ締め用）', () => {
   it('その日の注文だけを、全状態で、(day, number) の順に返す', async () => {

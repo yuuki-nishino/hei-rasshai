@@ -153,6 +153,7 @@
 - #16 のレビュー対応：`isWaiting`・`startWaitTicker` と `customerView` の組み合わせ（オフラインで、キャッシュだけの結果が届いても、8秒で slow）を偽のタイマーで、つながらない宛先で、存在しない注文の最初の結果が `fromCache: true`・文書なしになること（notFound にしない）を結合テストで確かめた（`setCustomer(9)`）
 - #16 の再レビュー対応：`watchOrder` のつなぎ直し（2秒から倍にして30秒まで・サーバーの結果で戻す・キャッシュの結果では戻さない・止めたら増えない・止めたあとの遅れたエラーは無視・項目の絞り込み）を、`src/lib/data/customerOrder.test.ts` で、`onSnapshot` を差し替え、偽のタイマーで確かめた。6つの行（戻す条件・倍にする・上限・停止の判定・タイマーの解除）を1つずつ外すと、テストが失敗することを確かめた
 - #17 の結果：`summarize`（取り消しの除外・現金とPayPayの分離・同じ品の合算・価格を変えた品は別の行・名前は最新の注文のもの〔作成時刻・同じなら番号・未確定は最新〕・並び順）、`closingView`（締めが無い・保存済みの準備金が優先・現金売上が変わったときだけ変更あり・保存済みの準備金で再計算・既知の制約）、`parseCashAmount`・`normalizeClosingNote`・`addDays` を、単体テスト（`test/domain/summary.test.ts`・`closing.test.ts`）で確認した。`saveClosing`・`getClosing`・`fetchOrdersOfDayFromServer` は、`test/data/closings.test.ts` で、本物のルールの下で確認した（保存・上書き・日ごとの記録・不正な入力は書く前に拒否・**オフラインは offline で、書き込みが溜まらない（#23）**・メンバー以外は permission）。**「締め後に変更あり」は、実際の操作で確かめた**（注文の追加・現金の注文の取り消しと戻し・現金からPayPayへの変更で、変更あり。PayPay の注文の追加は、変更なし。締め直すと、変更なしに戻る）。レジ締めの画面は、Emulator で、集計・差額・締め・再読み込み後の入れ直し・「締め後に変更あり」を確かめた
+- #18 の結果：`buildCsv`・`csvCell`・`csvFileName`・`buildSummaryText` を、単体テスト（`test/domain/csv.test.ts`）で確認した（BOM・CRLF・見出し・引用符・`= + - @`・タブ・`\r` で始まるセルの無害化・取り消しの含有・JSTの時刻・1000番以上・ファイル名の置き換えと制御文字・0件）。`fetchOrdersOfDay` は、`test/data/closings.test.ts` で、日の絞り込み・取り消しの含有・順序・`fromCache = false` を確認した。**`fromCache = true`（オフライン）の経路は、待ち時間が長く（約10秒）不安定になりやすいため、自動テストにしていない**。売上の画面は、Emulator・dev で確認する
 - #7 で分かったこと：ルールの文字数は UTF-16 の単位（絵文字は2文字）。画面の検査と `displayName` の切り詰めを、これに合わせた（data-model.md §2）
 
 ## 5. 実機の確認（手動）

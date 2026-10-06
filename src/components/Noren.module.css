@@ -1,4 +1,4 @@
-/* のれん：画面の上の帯。下の端に、切れ目を3本入れる */
+/* のれん：画面の上の帯。下の端に、切れ目を入れる（スマホでは3本。広い画面では、一定の間隔で並べる） */
 .noren {
   position: relative;
   padding: calc(var(--sp-3) + env(safe-area-inset-top, 0px)) var(--sp-4) var(--sp-3);
@@ -13,16 +13,11 @@
   inset-inline: 0;
   bottom: -10px;
   height: 10px;
-  background: linear-gradient(
-    90deg,
-    var(--color-brand) 0 24.6%,
-    transparent 24.6% 25.4%,
-    var(--color-brand) 25.4% 49.6%,
-    transparent 49.6% 50.4%,
-    var(--color-brand) 50.4% 74.6%,
-    transparent 74.6% 75.4%,
-    var(--color-brand) 75.4%
-  );
+  /* 切れ目の幅は、画面の幅によらず 3px。間隔は、幅の4分の1（広い画面では、120px で頭打ち）。右の端は、切れ目にしない */
+  --noren-panel: min(25%, 120px);
+  background:
+    linear-gradient(var(--color-brand), var(--color-brand)) right / 3px 100% no-repeat,
+    linear-gradient(90deg, var(--color-brand) calc(100% - 3px), transparent calc(100% - 3px)) left / var(--noren-panel) 100% repeat-x;
 }
 
 .inner {
