@@ -1,0 +1,22 @@
+.day {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--sp-2);
+  align-items: end;
+}
+
+.step {
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-3);
+  border: 2px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.today {
+  grid-column: 1 / -1;
+  justify-self: start;
+}

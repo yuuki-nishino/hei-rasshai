@@ -1,0 +1,126 @@
+.page {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+.h2 {
+  font-family: var(--font-hand);
+  font-size: var(--fs-xl);
+  font-weight: 400;
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.panel {
+  display: grid;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.rows {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.row dt {
+  color: var(--color-ink-sub);
+}
+
+.row dd {
+  margin: 0;
+  font-weight: 800;
+  font-size: var(--fs-lg);
+}
+
+.sub {
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  color: var(--color-ink-sub);
+}
+
+.inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+
+.noteField {
+  grid-column: 1 / -1;
+}
+
+/* 差額：一致＝緑、不一致＝赤。色だけでなく、「一致」「不足」「多い」の文字でも示す */
+.diff {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.match {
+  background: var(--status-ready-bg);
+  color: var(--status-ready-fg);
+}
+
+.mismatch {
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+}
+
+.pending {
+  background: var(--color-bg);
+  color: var(--color-ink-sub);
+}
+
+.notice {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.warn {
+  background: var(--status-cooking-bg);
+  color: var(--status-cooking-fg);
+}
+
+.error {
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+}
+
+.closed {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-nature-bg);
+  color: var(--color-ink);
+  font-size: var(--fs-sm);
+}
+
+.hint {
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+}

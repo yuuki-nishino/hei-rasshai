@@ -33,6 +33,7 @@ import { EventGate } from './event/EventGate';
 import { JoinPage } from './join/JoinPage';
 import { MenuPage } from './menu/MenuPage';
 import { ConfirmFlowDialog } from './order/ConfirmFlowDialog';
+import { ClosingPage } from './closing/ClosingPage';
 import { KitchenPage } from './kitchen/KitchenPage';
 import { OrderPage } from './order/OrderPage';
 import { InvitePanel } from './members/InvitePanel';
@@ -42,6 +43,7 @@ import { MembersPanel } from './members/MembersPanel';
 const TAB_LABELS: { id: TabId; label: string }[] = [
   { id: 'order', label: '注文' },
   { id: 'kitchen', label: '調理' },
+  { id: 'closing', label: 'レジ締め' },
   { id: 'menu', label: 'メニュー' },
   { id: 'event', label: 'イベント' },
 ];
@@ -86,6 +88,7 @@ function EventHome() {
         <div class={styles.main} id="tab-panel" role="tabpanel" aria-labelledby={tabId(tab)}>
           {tab === 'order' && eventId && <OrderPage eventId={eventId} />}
           {tab === 'kitchen' && eventId && uid && <KitchenPage eventId={eventId} uid={uid} />}
+          {tab === 'closing' && eventId && uid && <ClosingPage eventId={eventId} uid={uid} />}
           {tab === 'menu' && eventId && <MenuPage eventId={eventId} />}
           {tab === 'event' && (
             <>

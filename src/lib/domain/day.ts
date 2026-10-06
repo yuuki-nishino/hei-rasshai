@@ -35,3 +35,9 @@ const timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tokyo', hour:
 export function formatDateTime(date: Date): string {
   return `${formatDay(toDay(date))}${timeFmt.format(date)}`;
 }
+
+/** 日付に n 日足す（'2026-08-31' + 1 → '2026-09-01'）。暦の計算で、タイムゾーンに依存しない */
+export function addDays(day: Day, n: number): Day {
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}

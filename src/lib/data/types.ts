@@ -60,6 +60,18 @@ export interface MenuItem {
   soldOut: boolean;
 }
 
+/** レジ締め（data-model.md §2.8。closings/{day}） */
+export interface Closing {
+  day: string;
+  floatCash: number;
+  expectedCash: number;
+  actualCash: number;
+  diff: number;
+  note: string;
+  closedAt: Date | null;
+  closedBy: string;
+}
+
 /** 招待。期限（発行の1日後）は、画面で inviteExpiresAt で計算する。createdAt は、書き込み直後は見積もりの時刻 */
 export interface Invite {
   email: string;
