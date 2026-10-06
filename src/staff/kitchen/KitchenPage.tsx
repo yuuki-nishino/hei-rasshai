@@ -172,7 +172,8 @@ export function KitchenPage({ eventId, uid }: { eventId: string; uid: string }) 
           const latest = [...(activeOrders.peek()?.orders ?? []), ...(dayOrders ?? [])].find((o) => o.id === target.id);
           const plan = planCancel(latest);
           if (plan === 'already') showToast('success', `${target.number}番は、すでに取り消されています`);
-          else if (plan === 'missing' || !latest) showToast('error', `${target.number}番が見つかりませんでした。画面を確かめてください`);
+          // 画面に出ていない（済みも表示を閉じている間に、ほかのメンバーが「渡した」にした、など）。事実は言い切らない（PR #42 の再レビュー R1）
+          else if (plan === 'missing' || !latest) showToast('error', `${target.number}番の状態が変わったようです。画面を確かめてください`);
           else report(transitionOrder(eventId, latest, 'cancel', uid), target.number);
         }}
       >
