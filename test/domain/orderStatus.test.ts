@@ -4,6 +4,7 @@ import {
   availableActions,
   dayMark,
   elapsedMinutes,
+  planCancel,
   sortOrders,
   transitionPatch,
   type OrderAction,
@@ -85,5 +86,17 @@ describe('sortOrders / elapsedMinutes / dayMark', () => {
   it('日付の印：今日以外だけ（10/3 の形）', () => {
     expect(dayMark('2026-10-03', '2026-10-04')).toBe('10/3');
     expect(dayMark('2026-10-04', '2026-10-04')).toBeNull();
+  });
+});
+
+describe('planCancel（PR #42 のレビュー M1）', () => {
+  it('最新の状態で判断する：調理中・できあがり・お渡し済みは取り消せる（最新の状態から）', () => {
+    for (const status of ['preparing', 'ready', 'done'] as const) {
+      expect(planCancel({ status, cancelledFrom: null })).toBe('cancel');
+    }
+  });
+  it('すでに取り消されていれば書かない。見つからなければ書かない', () => {
+    expect(planCancel({ status: 'cancelled', cancelledFrom: 'ready' })).toBe('already');
+    expect(planCancel(undefined)).toBe('missing');
   });
 });

@@ -5,7 +5,8 @@ import { blurActiveInput } from './blurActiveInput';
 import styles from './Tabs.module.css';
 
 type Props<T extends string> = {
-  tabs: readonly { id: T; label: string }[];
+  /** badge：件数の印（LINE の通知のような、赤い丸に白い数字）。0・未指定なら出さない */
+  tabs: readonly { id: T; label: string; badge?: number }[];
   selected: T;
   onSelect: (id: T) => void;
   label: string;
@@ -39,10 +40,16 @@ export function Tabs<T extends string>({ tabs, selected, onSelect, label, panelI
           class={styles.tab}
           aria-selected={t.id === selected}
           aria-controls={panelId}
+          aria-label={t.badge ? `${t.label} ${t.badge}件` : undefined}
           tabIndex={t.id === selected ? 0 : -1}
           onClick={() => select(t.id)}
         >
           {t.label}
+          {t.badge ? (
+            <span class={styles.badge} aria-hidden="true">
+              {t.badge > 99 ? '99+' : t.badge}
+            </span>
+          ) : null}
         </button>
       ))}
     </div>

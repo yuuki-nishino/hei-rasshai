@@ -57,7 +57,7 @@ function EventHome() {
   useEffect(() => (eventId ? subscribeActiveOrders(eventId) : undefined), [eventId]);
   // 調理のタブに、調理中・できあがりの数を出す（新しい注文に気づけるように）
   const waiting = activeOrders.value?.orders.length ?? 0;
-  const tabs = TAB_LABELS.map((t) => (t.id === 'kitchen' && waiting > 0 ? { ...t, label: `調理 ${waiting}` } : t));
+  const tabs = TAB_LABELS.map((t) => (t.id === 'kitchen' ? { ...t, badge: waiting } : t));
 
   // イベントに入ったら、前回の確定の途中の記録（pending）が残っていないか確かめる（order-confirm.md §5.3）
   useEffect(() => {

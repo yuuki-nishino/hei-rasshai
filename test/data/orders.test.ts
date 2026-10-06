@@ -281,6 +281,19 @@ describe('transitionOrder（#9）', () => {
     expect((await rawOrder(id)).status).toBe('cancelled');
   });
 
+  it('古い状態（できあがり）から作った取り消し（cancelledFrom が古い）は、ルールが拒否する。最新の状態からなら通る（PR #42 のレビュー M1）', async () => {
+    setUser(ALICE);
+    const id = newOrderId('e1');
+    const o = await confirmOrder('e1', ctxOf(id), ALICE);
+    await transitionOrder('e1', o, 'ready', ALICE);
+    await transitionOrder('e1', { ...o, status: 'ready' }, 'done', ALICE); // ほかのメンバーが、先に「渡した」にした
+    // 確認ダイアログを開いた時点の古い状態（ready）から取り消す → cancelledFrom: 'ready' は、いまの状態（done）と合わない
+    await expect(transitionOrder('e1', { ...o, status: 'ready' }, 'cancel', ALICE)).rejects.toMatchObject({ code: 'permission' });
+    expect((await rawOrder(id)).status).toBe('done');
+    await transitionOrder('e1', { ...o, status: 'done' }, 'cancel', ALICE);
+    expect(await rawOrder(id)).toMatchObject({ status: 'cancelled', cancelledFrom: 'done' });
+  });
+
   it('メンバーでない人は、操作できない', async () => {
     setUser(ALICE);
     const id = newOrderId('e1');

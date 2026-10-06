@@ -1,13 +1,14 @@
 // 調理（screens.md §3.5）。左「調理中」・右「できあがり」（スマホ縦は、タブで切り替え）。
 // 「済みも表示」で、今日のお渡し済み・取り消しも出す（そのカードでも、支払い変更・戻す操作ができる）
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { Button } from '../../components/Button';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Loading } from '../../components/Feedback';
 import { AppError } from '../../lib/data/errors';
 import { changePayment, transitionOrder, watchOrdersOfDay } from '../../lib/data/orders';
 import type { Order } from '../../lib/data/types';
 import { toDay } from '../../lib/domain/day';
-import { sortOrders, type OrderAction } from '../../lib/domain/orderStatus';
+import { planCancel, sortOrders, type OrderAction } from '../../lib/domain/orderStatus';
 import { selectEvent } from '../../state/event';
 import { activeOrders, activeOrdersError } from '../../state/orders';
 import { showToast } from '../../state/toast';
@@ -42,24 +43,31 @@ export function KitchenPage({ eventId, uid }: { eventId: string; uid: string }) 
   const [column, setColumn] = useState<Column>('cooking');
   const [showFinished, setShowFinished] = useState(false);
   const [dayOrders, setDayOrders] = useState<Order[] | null>(null);
-  const [cancelling, setCancelling] = useState<Order | null>(null);
+  const [dayError, setDayError] = useState(false);
+  const [dayRetry, setDayRetry] = useState(0);
+  // 取り消しの確認は、注文のコピーではなく、id を持つ（確認を押した時点の最新の注文で判断する。レビュー M1）
+  const [cancelling, setCancelling] = useState<{ id: string; number: number } | null>(null);
   const [qrOrder, setQrOrder] = useState<Order | null>(null);
 
   // 「済みも表示」を入れたときだけ、今日の全状態を購読する
   useEffect(() => {
-    if (!showFinished) {
-      setDayOrders(null);
-      return;
-    }
+    // 日付が変わったときなど、購読し直す前に、前の日の一覧を捨てる（一瞬、前の日の一覧が残らないように。レビュー M3）
+    setDayOrders(null);
+    setDayError(false);
+    if (!showFinished) return;
     return watchOrdersOfDay(
       eventId,
       today,
-      (orders) => setDayOrders(orders),
+      (orders) => {
+        setDayOrders(orders);
+        setDayError(false);
+      },
       (e) => {
         if (e.code === 'permission') selectEvent(null);
+        else setDayError(true); // 読み込み中のまま止まらないように、知らせる（レビュー M2）
       },
     );
-  }, [eventId, showFinished, today]);
+  }, [eventId, showFinished, today, dayRetry]);
 
   const active = activeOrders.value;
   const cooking = useMemo(() => sortOrders((active?.orders ?? []).filter((o) => o.status === 'preparing')), [active]);
@@ -71,7 +79,7 @@ export function KitchenPage({ eventId, uid }: { eventId: string; uid: string }) 
   }
 
   const act = (order: Order, action: OrderAction) => {
-    if (action === 'cancel') setCancelling(order); // 取り消しだけ、確認ダイアログ（screens.md §3.5）
+    if (action === 'cancel') setCancelling({ id: order.id, number: order.number }); // 取り消しだけ、確認ダイアログ（screens.md §3.5）
     else report(transitionOrder(eventId, order, action, uid), order.number);
   };
   const togglePayment = (order: Order) => report(changePayment(eventId, order.id, order.payment === 'cash' ? 'paypay' : 'cash', uid), order.number);
@@ -129,7 +137,14 @@ export function KitchenPage({ eventId, uid }: { eventId: string; uid: string }) 
       {showFinished && (
         <>
           <h3 class={styles.finishedTitle}>今日のお渡し済み・取り消し {dayOrders ? finished.length : ''}</h3>
-          {!dayOrders ? (
+          {dayError && !dayOrders ? (
+            <div role="alert" class={styles.empty}>
+              <p>済みの注文を読み込めませんでした。通信を確認してください</p>
+              <Button variant="secondary" onClick={() => setDayRetry((n) => n + 1)}>
+                やり直す
+              </Button>
+            </div>
+          ) : !dayOrders ? (
             <Loading label="読み込み中…" />
           ) : finished.length === 0 ? (
             <p class={styles.empty}>お渡し済み・取り消しの注文は、まだありません</p>
@@ -150,9 +165,15 @@ export function KitchenPage({ eventId, uid }: { eventId: string; uid: string }) 
         danger
         onCancel={() => setCancelling(null)}
         onConfirm={() => {
-          const o = cancelling;
+          const target = cancelling;
           setCancelling(null);
-          if (o) report(transitionOrder(eventId, o, 'cancel', uid), o.number);
+          if (!target) return;
+          // 確認を押した時点の、最新の注文で判断する（開いている間に、ほかのメンバーが状態を変えていても、最新の状態から取り消す）
+          const latest = [...(activeOrders.peek()?.orders ?? []), ...(dayOrders ?? [])].find((o) => o.id === target.id);
+          const plan = planCancel(latest);
+          if (plan === 'already') showToast('success', `${target.number}番は、すでに取り消されています`);
+          else if (plan === 'missing' || !latest) showToast('error', `${target.number}番が見つかりませんでした。画面を確かめてください`);
+          else report(transitionOrder(eventId, latest, 'cancel', uid), target.number);
         }}
       >
         取り消した注文は、売上に含まれません。あとから「取り消しを戻す」で、元に戻せます。

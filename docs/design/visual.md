@@ -83,7 +83,7 @@ CSS は、部品ごとに CSS Modules（`*.module.css`）で書く（[ADR-0006](
 | `StatusBar` | 接続状態の帯（オンライン／オフライン／未送信◯件・未送信あり） |
 | `Noren` | 画面の上の帯（のれん）。見出し・補足・右端の操作。iPhone の上の切り欠きの分、余白を足す |
 | `Logo` | イベント注文アプリ「毎度おおきに」 |
-| `Tabs` | のれんの下のタブ（#10）。選んでいるタブは、弁柄の下線と太字。左右の矢印キーで移れる。中身は `role="tabpanel"` で結ぶ（`aria-controls`・`aria-labelledby`）。切り替える前に、入力中の欄を確定させる（`blurActiveInput`。iOS は、ボタンを押してもフォーカスを移さないため） |
+| `Tabs` | のれんの下のタブ（#10）。件数の印（`badge`）：赤い丸に白い数字（#15）。選んでいるタブは、弁柄の下線と太字。左右の矢印キーで移れる。中身は `role="tabpanel"` で結ぶ（`aria-controls`・`aria-labelledby`）。切り替える前に、入力中の欄を確定させる（`blurActiveInput`。iOS は、ボタンを押してもフォーカスを移さないため） |
 | `Loading` / `Empty` / `ErrorView` | 読み込み中・0件・取得失敗 |
 
 ## 4. ロゴ

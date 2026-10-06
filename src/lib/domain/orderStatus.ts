@@ -88,3 +88,13 @@ export function dayMark(day: Day, today: Day): string | null {
   const [, m, d] = day.split('-').map(Number) as [number, number, number];
   return `${m}/${d}`;
 }
+
+/**
+ * 取り消しの確認を押した時点の、最新の注文で判断する（ダイアログを開いている間に、ほかのメンバーが状態を変えることがある。
+ * PR #42 のレビュー M1）。cancel：最新の状態から取り消す（お渡し済みも取り消せる）。already：すでに取り消されている（書かない）。
+ * missing：見つからない（書かない）
+ */
+export function planCancel(latest: StatusOrder | undefined): 'cancel' | 'already' | 'missing' {
+  if (!latest) return 'missing';
+  return latest.status === 'cancelled' ? 'already' : 'cancel';
+}
