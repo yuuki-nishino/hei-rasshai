@@ -18,8 +18,8 @@ export interface Member {
   email: string;
 }
 
-export type Payment = 'cash' | 'paypay';
-export type OrderStatus = 'preparing' | 'ready' | 'done' | 'cancelled';
+export type { OrderStatus, Payment } from '../domain/orderStatus';
+import type { OrderStatus, Payment } from '../domain/orderStatus';
 
 export interface OrderLine {
   menuId: string;

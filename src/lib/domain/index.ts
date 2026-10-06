@@ -8,3 +8,4 @@ export * from './menu';
 export * from './order';
 export * from './confirmFlow';
 export * from './url';
+export * from './orderStatus';

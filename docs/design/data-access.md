@@ -92,8 +92,8 @@ type Unsubscribe = () => void;
 | `voidOrFind(eventId, orderId, uid): Promise<{ result: 'found'; order: Order } \| { result: 'voided' }>` | 「やめる」。注文があれば返し、なければ墓標を作る（トランザクション） |
 | `voidExistsOnServer(eventId, orderId): Promise<boolean>` | 墓標があるか（`getDocFromServer`）。確定が `permission` で拒否されたときの確認 |
 | `findOrderOnServer(eventId, orderId): Promise<Order \| null>` | `getDocFromServer`。オフラインなら `AppError('offline')` |
-| `watchActiveOrders(eventId, cb: (orders: Order[]) => void, onError): Unsubscribe` | `status in [preparing, ready]`。`includeMetadataChanges: true`。**Shell の階層で、イベントを選んでいる間は、常に購読する**（接続状態の判定と、調理画面で共有） |
-| `watchOrdersOfDay(eventId, day, cb, onError): Unsubscribe` | 調理画面の「済みも表示」用（全状態） |
+| `watchActiveOrders(eventId, cb: (orders: Order[], meta: { fromCache: boolean }) => void, onError): Unsubscribe` | `status in [preparing, ready]`。`includeMetadataChanges: true`。**Shell の階層で、イベントを選んでいる間は、常に購読する**（接続状態の判定と、調理画面で共有） |
+| `watchOrdersOfDay(eventId, day, cb, onError): Unsubscribe` | 調理画面の「済みも表示」用（全状態）。`watchActiveOrders` と同じ形（`(day, number)` の昇順・`includeMetadataChanges`） |
 | `fetchOrdersOfDay(eventId, day): Promise<{ orders: Order[]; fromCache: boolean }>` | 売上用（`getDocs`）。`fromCache` が `true` なら、画面に警告を出す |
 | `fetchOrdersOfDayFromServer(eventId, day): Promise<Order[]>` | レジ締め用（`getDocsFromServer`）。オフラインなら `AppError('offline')` |
 | `transitionOrder(eventId, order, action: OrderAction, uid): Promise<void>` | 下記。`updateDoc`（オフラインでも受け付ける） |
@@ -103,7 +103,8 @@ type Unsubscribe = () => void;
 type OrderAction = 'ready' | 'backToPreparing' | 'done' | 'backToReady' | 'cancel' | 'restore';
 ```
 - `transitionOrder` は、データ設計の遷移表（data-model.md §3）に従って、書き換える項目を決める。**不正な遷移は、書き込む前に `AppError('validation')` を投げる**
-- `transitionOrder` / `changePayment` は、§6 の `trackWrite` を通す（未送信の数え上げと、拒否の通知のため）
+- 計算は `lib/domain/orderStatus.ts`（`transitionPatch`：書き換える項目。できない遷移は `null`）。`'now'` の項目は、`serverTimestamp()` を書く（#15）
+- `transitionOrder` / `changePayment` は、§6 の `trackWrite` を通す（#19 で足す。#15 では、画面が Promise の拒否を `catch` して Toast を出す）（未送信の数え上げと、拒否の通知のため）
 - オフライン中の書き込みは、サーバーに届くまで、`Promise` が解決しない。UI は、**待たずに**画面を更新し（ローカルのキャッシュ）、拒否されたとき（他のメンバーが先に別の操作をした場合など）に、「◯番の操作を反映できませんでした」を表示する
 - 同時操作の競合は、サーバー側のルール（遷移の検証）で守る。後から届いた不正な遷移は拒否され、ローカルの表示は、サーバーの状態に戻る
 

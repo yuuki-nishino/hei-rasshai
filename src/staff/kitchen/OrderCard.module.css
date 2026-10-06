@@ -1,0 +1,123 @@
+.card {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+/* お渡し済み・取り消し：地の色にして、控えめに */
+.finished {
+  background: var(--color-bg);
+  box-shadow: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+}
+
+.number {
+  font-family: var(--font-hand);
+  font-size: var(--fs-3xl);
+  line-height: 1;
+  color: var(--color-ink);
+  -webkit-text-stroke: 0.035em currentColor;
+  paint-order: stroke fill;
+  font-variant-numeric: tabular-nums;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-2);
+}
+
+/* 今日以外の注文の、日付の印 */
+.dayMark {
+  padding: 0 8px;
+  border: 2px solid var(--status-void-fg);
+  border-radius: var(--radius-pill);
+  color: var(--status-void-fg);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* まだ送れていない操作がある（オフライン） */
+.pending {
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--status-cooking-bg);
+  color: var(--status-cooking-fg);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+.elapsed {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+.items {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
+}
+
+.itemName {
+  overflow-wrap: anywhere;
+}
+
+.qty {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.total {
+  display: flex;
+  justify-content: space-between;
+  padding-top: var(--sp-2);
+  border-top: 1px dashed var(--color-line);
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 操作：主の操作は大きく。副の操作は、離して置く（押し間違いを防ぐ） */
+.actions {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.secondary > * {
+  flex: 1 1 auto;
+}
+
+.danger {
+  margin-left: auto;
+}

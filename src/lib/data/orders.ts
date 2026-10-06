@@ -3,15 +3,21 @@ import {
   collection,
   doc,
   getDocFromServer,
+  onSnapshot,
+  query,
   runTransaction,
   serverTimestamp,
+  updateDoc,
+  where,
   type DocumentSnapshot,
+  type QuerySnapshot,
   type Timestamp,
 } from 'firebase/firestore';
 import type { ConfirmContext } from '../domain/confirmFlow';
+import { sortOrders, transitionPatch, type OrderAction, type TimeValue } from '../domain/orderStatus';
 import { db } from '../firebase/staff';
-import { toAppError } from './errors';
-import type { Order, OrderLine } from './types';
+import { AppError, toAppError } from './errors';
+import type { Order, OrderLine, Payment, Unsubscribe } from './types';
 
 const ordersCol = (eventId: string) => collection(db, 'events', eventId, 'orders');
 
@@ -181,4 +187,71 @@ export async function voidExistsOnServer(eventId: string, orderId: string): Prom
   } catch (e) {
     throw toAppError(e);
   }
+}
+
+/** 購読の補足。fromCache：サーバーで確かめていない一覧（接続状態の推定に使う。#19） */
+export interface OrdersMeta {
+  fromCache: boolean;
+}
+
+function handleSnapshot(snap: QuerySnapshot, cb: (orders: Order[], meta: OrdersMeta) => void) {
+  cb(
+    sortOrders(snap.docs.map(toOrder)),
+    { fromCache: snap.metadata.fromCache },
+  );
+}
+
+/**
+ * 調理中・できあがりの注文（status in [preparing, ready]）の購読。(day, number) の昇順。
+ * includeMetadataChanges：未送信（pending）の印と、fromCache の変化を受け取る。
+ * Shell の階層で、イベントを選んでいる間は、常に購読する（data-access.md §5）
+ */
+export function watchActiveOrders(eventId: string, cb: (orders: Order[], meta: OrdersMeta) => void, onError: (e: AppError) => void): Unsubscribe {
+  return onSnapshot(
+    query(ordersCol(eventId), where('status', 'in', ['preparing', 'ready'])),
+    { includeMetadataChanges: true },
+    (snap) => handleSnapshot(snap, cb),
+    (e) => onError(toAppError(e)),
+  );
+}
+
+/** その日の注文（全状態）の購読。調理画面の「済みも表示」用 */
+export function watchOrdersOfDay(eventId: string, day: string, cb: (orders: Order[], meta: OrdersMeta) => void, onError: (e: AppError) => void): Unsubscribe {
+  return onSnapshot(
+    query(ordersCol(eventId), where('day', '==', day)),
+    { includeMetadataChanges: true },
+    (snap) => handleSnapshot(snap, cb),
+    (e) => onError(toAppError(e)),
+  );
+}
+
+function validationError(message: string): AppError {
+  return Object.assign(new AppError('validation'), { message });
+}
+
+const timeValue = (v: TimeValue) => (v === 'now' ? serverTimestamp() : null);
+
+/**
+ * 状態を変える（完成・渡した・取り消しなど。data-model.md §3）。できない遷移は、書く前に AppError('validation')。
+ * 書き込みは、オフラインでも受け付ける（サーバーが受け取るまで、Promise は終わらない）。
+ * 画面は待たずに進め、拒否されたとき（他のメンバーが先に別の操作をした場合など）に知らせる
+ */
+export function transitionOrder(eventId: string, order: Pick<Order, 'id' | 'status' | 'cancelledFrom'>, action: OrderAction, uid: string): Promise<void> {
+  const patch = transitionPatch(order, action);
+  if (!patch) return Promise.reject(validationError('その操作は、いまの状態ではできません'));
+  const data: Record<string, unknown> = { status: patch.status, updatedBy: uid, updatedAt: serverTimestamp() };
+  if (patch.cancelledFrom !== undefined) data.cancelledFrom = patch.cancelledFrom;
+  if (patch.readyAt !== undefined) data.readyAt = timeValue(patch.readyAt);
+  if (patch.doneAt !== undefined) data.doneAt = timeValue(patch.doneAt);
+  if (patch.cancelledAt !== undefined) data.cancelledAt = timeValue(patch.cancelledAt);
+  return updateDoc(doc(ordersCol(eventId), order.id), data).catch((e: unknown) => {
+    throw toAppError(e);
+  });
+}
+
+/** 支払い方法の変更（現金とPayPayの取り違えの訂正。状態は変えない）。オフラインでも受け付ける */
+export function changePayment(eventId: string, orderId: string, payment: Payment, uid: string): Promise<void> {
+  return updateDoc(doc(ordersCol(eventId), orderId), { payment, updatedBy: uid, updatedAt: serverTimestamp() }).catch((e: unknown) => {
+    throw toAppError(e);
+  });
 }
