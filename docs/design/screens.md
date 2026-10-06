@@ -239,9 +239,17 @@ App
 - 「できあがり」へ変わった瞬間：直前の状態が `preparing` で、新しい状態が `ready` のとき、`navigator.vibrate?.([200, 100, 200])`。**最初の表示のときは、振動しない**
 - 支払い方法・**メモ**・スタッフの情報は、表示しない（#40。メモは、注文の文書に入るため、注文IDを知っている人は、技術的には読める。そのため、入力欄で、個人の名前などを書かないよう注意を添える）
 
+- #16 の実装：
+  - **注文のリンクの検査**：`e`・`o` が英数字20文字かを、`parseOrderLink` で見る（不正なら、購読せず、「このQRは正しくありません」）
+  - **お客様に渡す項目**：`lib/data/customerOrder.ts` の `toCustomerOrder` が、番号・状況・明細（名前・単価・数量）・合計だけを取り出す。支払い方法・メモ・`createdBy` などは、取り出さない（`CustomerOrder` の型にも持たない）
+  - 状態の判定は、`customerView(snapshot, waitedMs)`（`lib/domain/customerView.ts`）。`!exists && fromCache` は、loading のまま（8秒続いたら slow ＝「通信が不安定です」）
+  - **できあがりの見せ方**：カードを緑にし、番号・バッジを大きくし、ゆっくり脈打たせる（`prefers-reduced-motion` のときは止める）。振動は、直前が調理中のときだけ（`shouldVibrate`。最初の表示では、しない）。タブの題名にも「12番 お待ち！」を出す
+  - 最終更新時刻は、スナップショットを受け取った時刻（`formatClock`。Asia/Tokyo）。`fromCache` が続くときは、「通信が不安定です」
+  - ホーム画面への追加は、求めない（manifest・Service Worker は、お客様画面には無い）
+
 ### 4.3 軽さ
 - 別エントリ。Preact・Firestore（`onSnapshot` が必要なため、フル版）と、画面のコードだけを読み込む（Auth・スタッフ画面・QR生成・CSVは含まない）
-- **初回に読み込むJavaScriptは、gzip後 200KB 以下を目標**にする（ビルドで計測し、超えたら見直す。Firestore SDKが大半を占める見込み）
+- **初回に読み込むJavaScriptは、gzip後 200KB 以下**にする。**ビルドで計測し、超えたら失敗させる**（`scripts/build.mjs`。`customer.html` が読み込む JavaScript の、gzip後の合計）。#16 の時点で、約135KB（Preact・Firestore〔メモリキャッシュ・`onSnapshot`〕・画面。★F1）
 - 画像・Webフォントは使わない（システムフォント）
 - `<meta name="robots" content="noindex">`、`Referrer-Policy: same-origin`
 
