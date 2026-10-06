@@ -58,7 +58,7 @@ export function shouldVibrate(prev: CustomerStatus | null, next: CustomerStatus)
 /** 状況ごとの、バッジと案内文（SPEC 6.7） */
 export const CUSTOMER_STATUS_TEXT: Record<CustomerStatus, { badge: string; message: string }> = {
   preparing: { badge: '調理中', message: 'ただいま調理中です。できあがるまでこのままお待ちください' },
-  ready: { badge: 'お待ち！', message: '受け渡し口までお越しください' },
+  ready: { badge: 'へい、お待ち！', message: '受け渡し口までお越しください' },
   done: { badge: 'お渡し済み', message: '毎度おおきに！' },
   cancelled: { badge: '取り消し', message: 'この注文は取り消されました。お近くのスタッフへお声がけください' },
 };

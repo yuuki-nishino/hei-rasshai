@@ -78,7 +78,8 @@
 }
 
 .ready .badge {
-  font-size: 2rem;
+  font-size: 1.75rem; /* 「へい、お待ち！」が、狭い画面でも、1行に収まる大きさ */
+  white-space: nowrap;
 }
 
 .message {

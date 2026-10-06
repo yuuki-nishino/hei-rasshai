@@ -243,7 +243,7 @@ App
   - **注文のリンクの検査**：`e`・`o` が英数字20文字かを、`parseOrderLink` で見る（不正なら、購読せず、「このQRは正しくありません」）
   - **お客様に渡す項目**：`lib/data/customerOrder.ts` の `toCustomerOrder` が、番号・状況・明細（名前・単価・数量）・合計だけを取り出す。支払い方法・メモ・`createdBy` などは、取り出さない（`CustomerOrder` の型にも持たない）
   - 状態の判定は、`customerView(snapshot, waitedMs)`（`lib/domain/customerView.ts`）。`!exists && fromCache` は、loading のまま（8秒続いたら slow ＝「通信が不安定です」）
-  - **できあがりの見せ方**：カードを緑にし、番号・バッジを大きくし、ゆっくり脈打たせる（`prefers-reduced-motion` のときは止める）。振動は、直前が調理中のときだけ（`shouldVibrate`。最初の表示では、しない）。タブの題名にも「12番 お待ち！」を出す
+  - **できあがりの見せ方**：カードを緑にし、番号・バッジを大きくし、ゆっくり脈打たせる（`prefers-reduced-motion` のときは止める）。振動は、直前が調理中のときだけ（`shouldVibrate`。最初の表示では、しない）。タブの題名にも「12番 へい、お待ち！」を出す
   - 最終更新時刻は、スナップショットを受け取った時刻（`formatClock`。Asia/Tokyo）。`fromCache` が続くときは、「通信が不安定です」
   - ホーム画面への追加は、求めない（manifest・Service Worker は、お客様画面には無い）
   - 読み込みの待ち時間は、「読み込み中と判定されている間」数える（結果が届いたかではなく、`isWaiting`。オフラインで、キャッシュだけの結果が届いても、8秒で「通信が不安定です」が出る。`startWaitTicker`。PR #44 のレビュー V1）

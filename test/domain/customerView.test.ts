@@ -71,7 +71,7 @@ describe('shouldVibrate', () => {
 describe('CUSTOMER_STATUS_TEXT（SPEC 6.7）', () => {
   it('バッジと案内文', () => {
     expect(CUSTOMER_STATUS_TEXT.preparing).toEqual({ badge: '調理中', message: 'ただいま調理中です。できあがるまでこのままお待ちください' });
-    expect(CUSTOMER_STATUS_TEXT.ready).toEqual({ badge: 'お待ち！', message: '受け渡し口までお越しください' });
+    expect(CUSTOMER_STATUS_TEXT.ready).toEqual({ badge: 'へい、お待ち！', message: '受け渡し口までお越しください' });
     expect(CUSTOMER_STATUS_TEXT.done).toEqual({ badge: 'お渡し済み', message: '毎度おおきに！' });
     expect(CUSTOMER_STATUS_TEXT.cancelled.badge).toBe('取り消し');
   });
