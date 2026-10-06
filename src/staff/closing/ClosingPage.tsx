@@ -1,7 +1,7 @@
 // レジ締め（screens.md §3.7、SPEC 6.4）。日付ごとに、準備金・あるはずの現金・数えた現金・差額を確かめ、記録する。
 // サーバーの確かな値（fetchOrdersOfDayFromServer・getClosing）でだけ行う。オフラインのときは、集計を出さず、「締める」を無効にする
 import type { TargetedEvent } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '../../components/Button';
 import { DaySelector } from '../../components/DaySelector';
 import { Loading } from '../../components/Feedback';
@@ -30,6 +30,12 @@ import styles from './ClosingPage.module.css';
 
 type Load = { status: 'loading' } | { status: 'error'; code: string } | { status: 'ok'; summary: Summary; closing: Closing | null };
 
+/** 「差額：一致」「差額：不足 ¥100」「差額：多い ¥100」（負の金額を、「¥-100」とは書かない） */
+function diffLabel(diff: number): string {
+  const kind = diffKind(diff);
+  return kind === 'match' ? '差額：一致' : `差額：${kind === 'short' ? '不足' : '多い'} ${formatYen(Math.abs(diff))}`;
+}
+
 function saveMessage(e: unknown): string {
   if (e instanceof AppError && e.code === 'offline') return '通信できません。レジ締めは、通信できる状態で行ってください';
   if (e instanceof AppError && e.code === 'timeout') return '送れていません。通信を確かめて、もう一度締めてください';
@@ -49,16 +55,17 @@ export function ClosingPage({ eventId, uid }: { eventId: string; uid: string }) 
   const [floatText, setFloatText] = useState('');
   const [actualText, setActualText] = useState('');
   const [noteText, setNoteText] = useState('');
-  const [inited, setInited] = useState(false);
+  // 次に取得できたとき、入力を、締めの記録から入れ直す（最初・日付を変えたとき・締めたあと）。「更新」では、入れ直さない
+  const initNextRef = useRef(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // 締めた人の表示名を引くため（引けないときは「（退会済み）」。screens.md §1.4）
   useEffect(() => watchMembers(eventId, setMembers, () => {}), [eventId]);
 
-  // 日付を変えたら、入力を入れ直す
+  // 日付を変えたら、入力を入れ直す（取得の前に、目印を立てる。下の取得の副作用より、先に宣言する）
   useEffect(() => {
-    setInited(false);
+    initNextRef.current = true;
     setSaveError(null);
   }, [day]);
 
@@ -72,7 +79,16 @@ export function ClosingPage({ eventId, uid }: { eventId: string; uid: string }) 
     setLoad({ status: 'loading' });
     Promise.all([fetchOrdersOfDayFromServer(eventId, day), getClosing(eventId, day)]).then(
       ([orders, closing]) => {
-        if (!cancelled) setLoad({ status: 'ok', summary: summarize(orders), closing });
+        if (cancelled) return;
+        const summary = summarize(orders);
+        setLoad({ status: 'ok', summary, closing });
+        if (initNextRef.current) {
+          // 入力の初期値：準備金は、締めがあればその準備金、無ければイベントの準備金
+          initNextRef.current = false;
+          setFloatText(String(closingView(summary, closing, eventFloat).initialFloat));
+          setActualText(closing ? String(closing.actualCash) : '');
+          setNoteText(closing?.note ?? '');
+        }
       },
       (e: unknown) => {
         console.error(e);
@@ -82,17 +98,7 @@ export function ClosingPage({ eventId, uid }: { eventId: string; uid: string }) 
     return () => {
       cancelled = true;
     };
-  }, [eventId, day, reload, online]);
-
-  // 取得できたら、入力の初期値を入れる（準備金：締めがあればその準備金、無ければイベントの準備金）
-  useEffect(() => {
-    if (load.status !== 'ok' || inited) return;
-    const view = closingView(load.summary, load.closing, eventFloat);
-    setFloatText(String(view.initialFloat));
-    setActualText(load.closing ? String(load.closing.actualCash) : '');
-    setNoteText(load.closing?.note ?? '');
-    setInited(true);
-  }, [load, inited, eventFloat]);
+  }, [eventId, day, reload, online, eventFloat]);
 
   const loaded = load.status === 'ok' ? load : null;
   const view = loaded ? closingView(loaded.summary, loaded.closing, eventFloat) : null;
@@ -111,7 +117,7 @@ export function ClosingPage({ eventId, uid }: { eventId: string; uid: string }) 
       // 締めるのは、サーバーから取得して集計した、いまの現金売上で（部分的なキャッシュで締めない）
       await saveClosing(eventId, day, { floatCash, expectedCash: expected, actualCash, note }, uid);
       showToast('success', 'レジ締めを保存しました');
-      setInited(false); // 保存された記録から、入れ直す
+      initNextRef.current = true; // 保存された記録から、入れ直す
       setReload((n) => n + 1);
     } catch (e) {
       console.error(e);
@@ -153,8 +159,8 @@ export function ClosingPage({ eventId, uid }: { eventId: string; uid: string }) 
         <>
           {loaded.closing && (
             <p class={styles.closed}>
-              {formatDateTime(loaded.closing.closedAt ?? new Date())}に、{closedBy}が締めました（数えた現金 {formatYen(loaded.closing.actualCash)}・差額{' '}
-              {formatYen(loaded.closing.diff)}）。締め直すと、上書きされます
+              {formatDateTime(loaded.closing.closedAt ?? new Date())}に、{closedBy}が締めました（数えた現金 {formatYen(loaded.closing.actualCash)}・
+              {diffLabel(loaded.closing.diff)}）。締め直すと、上書きされます
             </p>
           )}
           {/* 締めた後に、現金売上が変わった（注文の追加・取り消し・支払い方法の変更）。締めの記録は、上書きするまで変わらない */}
