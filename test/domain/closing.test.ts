@@ -41,8 +41,9 @@ describe('closingView', () => {
     expect(closingView({ cashTotal: 15000 }, saved, 99999).changedAfterClosing).toBe(false);
   });
 
-  it('既知の制約：現金 → PayPay と、PayPay → 現金が、同額で相殺されると、検知できない', () => {
-    expect(closingView({ cashTotal: 15000 }, saved, 8000).changedAfterClosing).toBe(false);
+  it('現金売上の合計だけで判定する（現金 → PayPay と PayPay → 現金が同額で相殺され、合計が同じなら、区別できない）', () => {
+    // 合計が同じなら変更なし。区別するには、注文ごとの記録が必要（設計上の既知の制約）
+    expect(closingView({ cashTotal: saved.expectedCash - saved.floatCash }, saved, 8000).changedAfterClosing).toBe(false);
   });
 });
 

@@ -59,6 +59,11 @@ export function ClosingPage({ eventId, uid }: { eventId: string; uid: string }) 
   const initNextRef = useRef(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // イベントの準備金は、入力の初期値にしか使わない。取得の副作用の依存に入れない（変わるたびに読み込み直すと、フォームが一瞬消える。レビュー C2）
+  const eventFloatRef = useRef(eventFloat);
+  useEffect(() => {
+    eventFloatRef.current = eventFloat;
+  }, [eventFloat]);
 
   // 締めた人の表示名を引くため（引けないときは「（退会済み）」。screens.md §1.4）
   useEffect(() => watchMembers(eventId, setMembers, () => {}), [eventId]);
@@ -85,7 +90,7 @@ export function ClosingPage({ eventId, uid }: { eventId: string; uid: string }) 
         if (initNextRef.current) {
           // 入力の初期値：準備金は、締めがあればその準備金、無ければイベントの準備金
           initNextRef.current = false;
-          setFloatText(String(closingView(summary, closing, eventFloat).initialFloat));
+          setFloatText(String(closingView(summary, closing, eventFloatRef.current).initialFloat));
           setActualText(closing ? String(closing.actualCash) : '');
           setNoteText(closing?.note ?? '');
         }
@@ -98,7 +103,7 @@ export function ClosingPage({ eventId, uid }: { eventId: string; uid: string }) 
     return () => {
       cancelled = true;
     };
-  }, [eventId, day, reload, online, eventFloat]);
+  }, [eventId, day, reload, online]);
 
   const loaded = load.status === 'ok' ? load : null;
   const view = loaded ? closingView(loaded.summary, loaded.closing, eventFloat) : null;
@@ -114,7 +119,15 @@ export function ClosingPage({ eventId, uid }: { eventId: string; uid: string }) 
     setSaving(true);
     setSaveError(null);
     try {
-      // 締めるのは、サーバーから取得して集計した、いまの現金売上で（部分的なキャッシュで締めない）
+      // 保存の直前に、サーバーから取得し直す。画面の数字から変わっていたら、書かずに、新しい数字を見せて確かめてもらう（レビュー C1）
+      const latest = summarize(await fetchOrdersOfDayFromServer(eventId, day));
+      if (latest.cashTotal !== loaded.summary.cashTotal) {
+        setLoad({ status: 'ok', summary: latest, closing: loaded.closing });
+        setSaveError(
+          `現金売上が変わりました（${formatYen(loaded.summary.cashTotal)} → ${formatYen(latest.cashTotal)}）。新しい金額を確かめて、もう一度押してください`,
+        );
+        return;
+      }
       await saveClosing(eventId, day, { floatCash, expectedCash: expected, actualCash, note }, uid);
       showToast('success', 'レジ締めを保存しました');
       initNextRef.current = true; // 保存された記録から、入れ直す
