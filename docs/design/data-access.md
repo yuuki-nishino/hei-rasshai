@@ -98,14 +98,14 @@ type Unsubscribe = () => void;
 | `fetchOrdersOfDayFromServer(eventId, day): Promise<Order[]>` | レジ締め用（`getDocsFromServer`。`(day, number)` の昇順）。オフラインなら `AppError('offline')`。8秒で応答がなければ、同じく offline（キャッシュを返さない） |
 | `transitionOrder(eventId, order, action: OrderAction, uid): Promise<void>` | 下記。`updateDoc`（オフラインでも受け付ける） |
 | `changePayment(eventId, orderId, payment, uid): Promise<void>` | |
-| `changeNote(eventId, orderId, note, uid): Promise<void>` | メモの変更（#40）。`note` は `normalizeNote`（`lib/domain/note.ts`：改行は空白に、前後の空白を除く。100文字まで）済みのもの。空にもできる。101文字以上は、書く前に `AppError('validation')`。`changePayment` と同じく、オフラインでも受け付ける（`trackWrite` の対象にするのは #19）。同時に直したときは、後から届いた方が勝つ |
+| `changeNote(eventId, orderId, note, uid): Promise<void>` | メモの変更（#40）。`note` は `normalizeNote`（`lib/domain/note.ts`：改行は空白に、前後の空白を除く。100文字まで）済みのもの。空にもできる。101文字以上は、書く前に `AppError('validation')`。`changePayment` と同じく、オフラインでも受け付け、画面が `trackWrite` で数える（#19）。同時に直したときは、後から届いた方が勝つ |
 
 ```ts
 type OrderAction = 'ready' | 'backToPreparing' | 'done' | 'backToReady' | 'cancel' | 'restore';
 ```
 - `transitionOrder` は、データ設計の遷移表（data-model.md §3）に従って、書き換える項目を決める。**不正な遷移は、書き込む前に `AppError('validation')` を投げる**
 - 計算は `lib/domain/orderStatus.ts`（`transitionPatch`：書き換える項目。できない遷移は `null`）。`'now'` の項目は、`serverTimestamp()` を書く（#15）
-- `transitionOrder` / `changePayment` は、§6 の `trackWrite` を通す（#19 で足す。#15 では、画面が Promise の拒否を `catch` して Toast を出す）（未送信の数え上げと、拒否の通知のため）
+- `transitionOrder` / `changePayment` / `changeNote` は、**呼ぶ画面が**、返した `Promise` を §6 の `trackWrite` に渡す（調理画面の `report`。未送信の数え上げと、拒否の Toast のため。#19）。関数自体は、数えない（`Promise` を返すだけ）
 - オフライン中の書き込みは、サーバーに届くまで、`Promise` が解決しない。UI は、**待たずに**画面を更新し（ローカルのキャッシュ）、拒否されたとき（他のメンバーが先に別の操作をした場合など）に、「◯番の操作を反映できませんでした」を表示する
 - 同時操作の競合は、サーバー側のルール（遷移の検証）で守る。後から届いた不正な遷移は拒否され、ローカルの表示は、サーバーの状態に戻る
 
@@ -131,7 +131,7 @@ type OrderAction = 'ready' | 'backToPreparing' | 'done' | 'backToReady' | 'cance
 | `calcTotal(lines)` / `calcChange(total, tendered)` | |
 | `nextAction(status)` / `canTransition(from, to)` | 状態遷移 |
 | `confirmReducer(state, event)` | 確定フローの状態遷移（order-confirm.md） |
-| `connectionStatus(input)` | 接続状態の推定（§6） |
+| `connectionStatus(input)` / `statusBarView(input)` | 接続状態の推定と、ヘッダーの表示の判定（§6。`lib/domain/connection.ts`） |
 | `customerView(input)` | お客様画面の状態の判定（screens.md §4.1） |
 | `orderUrl(origin, eventId, orderId)` | QRに入れるURL |
 
@@ -182,12 +182,16 @@ class AppError extends Error { code: AppErrorCode; cause?: unknown }
 ## 6. 接続状態と未送信
 
 ### 6.1 接続状態の判定
-Firestore SDK は、接続状態を直接は公開しない。次のように推定する（純粋関数 `connectionStatus`）。
+Firestore SDK は、接続状態を直接は公開しない。次のように推定する（純粋関数 `connectionStatus`。`lib/domain/connection.ts`）。
 
 | 状態 | 条件 |
 |---|---|
 | オフライン | `navigator.onLine === false`、または、Shell の購読の最新スナップショットが `metadata.fromCache === true` のまま **10秒以上**続いている |
 | オンライン | 上記以外 |
+
+- `connectionStatus({ browserOnline, fromCacheSince, now })`：`fromCacheSince` は、`fromCache` になった時刻（サーバーに届いている・購読していないときは `null`）。ちょうど10秒でオフライン
+- `state/connection.ts`：`watchActiveOrders` のスナップショットのたびに `reportSnapshot(fromCache)` を呼ぶ。`fromCache` になった時刻を覚え、スナップショットが来なくても、10秒後に判定をやり直す（タイマー）。購読を止めたら、`fromCache` の記録を消す（`navigator.onLine` だけで判定する）
+- ★N1（遅すぎ・早すぎ）は、devの実機で確かめる（testing.md §5）
 
 ### 6.2 未送信の数え上げ
 「渡した」「取り消し」の書き込みは、書いた直後に、注文が購読の範囲（`status in [preparing, ready]`）から外れる。**そのため、`hasPendingWrites` では、数えられない**。アプリ側で、書き込みを数える。
@@ -197,14 +201,15 @@ Firestore SDK は、接続状態を直接は公開しない。次のように推
 const pendingWrites = signal(0);       // 未送信の書き込みの数
 const pendingUnknown = signal(false);  // 数は不明だが、未送信がある（再読み込み後）
 
-function trackWrite(p: Promise<void>, describe: string, onRejected: (e: AppError) => void): void {
+function trackWrite(p: Promise<void>, onRejected: (e: AppError) => void): void {
   pendingWrites.value++;
-  p.then(() => {}, (e) => onRejected(toAppError(e, describe)))
+  p.then(() => {}, (e) => onRejected(toAppError(e)))
    .finally(() => { pendingWrites.value--; });
 }
 ```
-- 対象：`transitionOrder`、`changePayment`（確定はオンライン必須のため対象外）。メニューの編集などは、数えなくてよい
-- 表示：`pendingWrites > 0` なら「未送信◯件」。再読み込みの直後は、`waitForPendingWrites(db)` を1.5秒だけ待ち、解決しなければ `pendingUnknown = true`（「未送信あり」。件数は不明）にし、解決したら消す
+- 対象：`transitionOrder`、`changePayment`、`changeNote`（確定はオンライン必須のため対象外）。メニューの編集などは、数えなくてよい。数えるのは、**呼ぶ画面**（`trackWrite(transitionOrder(...), onRejected)`）。検証で失敗した操作（`validation`）も、拒否として通知し、数えは戻る
+- 表示（`statusBarView`）：オフライン ＞ 未送信あり ＞ オンライン。`pendingWrites > 0` なら「未送信◯件」。オフラインのときは、「オフライン（未送信◯件）」（件数が分かるときだけ）
+- 再読み込みの直後（`main.tsx` の起動時に `checkPendingAfterReload`）は、`waitForPendingWrites(db)` を1.5秒だけ待ち、解決しなければ `pendingUnknown = true`（「未送信あり」。件数は不明）にし、解決したら消す
 - **既知の制約**：アプリを再読み込みすると、メモリ上の `Promise` が失われる。再読み込みをまたいで、サーバーに拒否された書き込みは、**通知できない**（画面は、購読で、サーバーの状態に戻る）。「未送信あり」が消えたあとで、調理画面の状態を確認する運用とする（C2）
 
 ## 7. イベント削除
@@ -244,7 +249,7 @@ Cloud Functions を使わないため、**オーナーの端末から、配下�
 - `clearIndexedDbPersistence` は、Firestoreを終了した後でなければ呼べない。そのため、再読み込みを伴う
 
 **#9 の実装**（`lib/data/cache.ts`、`lib/domain/cacheClear.ts`、`state/cacheClear.ts`・`state/logout.ts`）
-- 未送信の有無：`hasPendingWrites()`＝`waitForPendingWrites(db)` が1.5秒以内に終わらなければ「ある」とみなす（`trackWrite` の件数（§6.2、#19）ができるまでの代わり。再読み込みをまたいだ未送信も数えられる）
+- 未送信の有無：`hasPendingWrites()`＝`waitForPendingWrites(db)` が1.5秒以内に終わらなければ「ある」とみなす（ログアウト・消去の判断用。`trackWrite` の件数（§6.2）と違い、再読み込みをまたいだ未送信や、メニューの編集も含む）
 - **メンバーでなくなったことの検知**：`permission-denied` の代わりに、`watchMyEvents` のサーバーで確かめた `memberOf` を使う。これまでに見た自分のイベント（`hei:knownEvents`）のうち、`memberOf` から消えたものがあれば、外れた（外された・抜けた・イベントが消えた・別のアカウントでログインした）とみなし、`hei:clearPending`（`{ since, events }`）に記録する。購読のエラーより確実で、アプリを閉じている間に外された場合も、次の起動で分かる
 - 消去の判断（`decideCacheClear`）：未送信が無い → すぐ消す（再読み込み）。ある → 持ち越す。24時間たっても残る → 「未送信の操作が残っています」の確認を出し、確認が取れれば消す
 - **別のイベントで作業している最中は、すぐには消さない**（再読み込みで、作業が途切れるため）。一覧に戻ったとき（作業の切れ目）と、次の起動時に試す。外されたイベント自体を開いていたときは、一覧に戻してから、すぐ試す

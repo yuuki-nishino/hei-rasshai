@@ -1,14 +1,15 @@
 // 調理中・できあがりの注文（screens.md §1.2・§3.5）。Shell の階層（イベントを選んでいる間）で、常に購読する。
-// 接続状態の判定（#19）と、調理画面で共有するため
+// 接続状態の判定（state/connection.ts）と、調理画面で共有するため
 import { signal } from '@preact/signals';
 import type { AppError } from '../lib/data/errors';
 import { watchActiveOrders } from '../lib/data/orders';
 import type { Order } from '../lib/data/types';
+import { reportSnapshot, resetConnection } from './connection';
 import { selectEvent } from './event';
 
 export interface ActiveOrdersState {
   orders: Order[];
-  /** サーバーで確かめていない一覧（オフライン）。#19 の接続状態の推定に使う */
+  /** サーバーで確かめていない一覧（オフライン）。接続状態の推定に使う */
   fromCache: boolean;
 }
 
@@ -20,10 +21,12 @@ export const activeOrdersError = signal<AppError | null>(null);
 export function subscribeActiveOrders(eventId: string): () => void {
   activeOrders.value = null;
   activeOrdersError.value = null;
+  resetConnection();
   const unsubscribe = watchActiveOrders(
     eventId,
     (orders, meta) => {
       activeOrders.value = { orders, fromCache: meta.fromCache };
+      reportSnapshot(meta.fromCache);
       activeOrdersError.value = null;
     },
     (e) => {
@@ -34,5 +37,6 @@ export function subscribeActiveOrders(eventId: string): () => void {
   return () => {
     unsubscribe();
     activeOrders.value = null;
+    resetConnection();
   };
 }

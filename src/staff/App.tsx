@@ -3,6 +3,7 @@ import { useEffect } from 'preact/hooks';
 import { Button } from '../components/Button';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Toast, ToastRegion } from '../components/Toast';
+import { StatusBar } from '../components/StatusBar';
 import { Noren } from '../components/Noren';
 import { blurActiveInput } from '../components/blurActiveInput';
 import { tabId, Tabs } from '../components/Tabs';
@@ -20,6 +21,7 @@ import {
   resumePending,
   retryConfirm,
 } from '../state/confirm';
+import { statusView } from '../state/connection';
 import { currentEventId, selectEvent } from '../state/event';
 import { logoutConfirm, logoutNow, requestLogout } from '../state/logout';
 import { currentEvent } from '../state/myEvents';
@@ -57,7 +59,7 @@ function EventHome() {
   const isOwner = !!event && !!uid && event.ownerUid === uid;
   const tab = currentTab.value;
 
-  // Shell：イベントを選んでいる間、調理中・できあがりの注文を、常に購読する（どのタブでも。接続状態の判定は #19）
+  // Shell：イベントを選んでいる間、調理中・できあがりの注文を、常に購読する（どのタブでも。接続状態の判定に使う）
   useEffect(() => (eventId ? subscribeActiveOrders(eventId) : undefined), [eventId]);
   // 調理のタブに、調理中・できあがりの数を出す（新しい注文に気づけるように）
   const waiting = activeOrders.value?.orders.length ?? 0;
@@ -70,6 +72,7 @@ function EventHome() {
 
   return (
     <>
+      <StatusBar connection={statusView.value.connection} pendingCount={statusView.value.pendingCount} />
       <Noren
         title={event?.name ?? 'イベント'}
         sub={event ? formatDayRange(event.startDate, event.endDate) : undefined}
