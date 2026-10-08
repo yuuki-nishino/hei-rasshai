@@ -92,12 +92,14 @@ describe('すぐ書く（flush）', () => {
 
   it('同じ注文に続けて操作（「完成」→「渡した」）：前の保留を先に書き、次を保留する', () => {
     start(order());
+    const firstSeq = store.holds.value[0]!.seq;
     vi.advanceTimersByTime(2000);
     // 画面に見えている注文は、保留を反映した状態（できあがり）
     expect(start(order({ status: 'ready' }), 'done')).toBe(true);
     expect(write).toHaveBeenCalledTimes(1);
     expect(write.mock.calls[0]![0]).toMatchObject({ action: 'ready' });
     expect(store.holds.value).toMatchObject([{ action: 'done', to: 'done', written: false }]);
+    expect(store.holds.value[0]!.seq).not.toBe(firstSeq); // 表示を作り直す（残り時間の帯を、最初からにする。H1）
     // 前の保留の、書き込み済みの印が消える時刻に、新しい保留が消えない
     vi.advanceTimersByTime(SETTLE);
     expect(store.holds.value).toHaveLength(1);

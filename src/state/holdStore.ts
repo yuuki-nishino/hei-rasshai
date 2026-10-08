@@ -7,6 +7,8 @@ import { transitionPatch, type OrderAction, type OrderStatus } from '../lib/doma
 
 export interface Hold {
   orderId: string;
+  /** 保留ごとの連番（同じ注文に続けて保留しても、表示を作り直して、残り時間の帯を最初からにするため。PR #51 のレビュー H1） */
+  seq: number;
   number: number;
   eventId: string;
   uid: string;
@@ -30,6 +32,7 @@ export interface HoldDeps {
 export function createHoldStore({ graceMs, settleMs, write }: HoldDeps) {
   const holds = signal<Hold[]>([]);
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  let seq = 0;
 
   const find = (orderId: string) => holds.value.find((h) => h.orderId === orderId);
   const replace = (from: Hold, to: Hold | null) => {
@@ -60,7 +63,7 @@ export function createHoldStore({ graceMs, settleMs, write }: HoldDeps) {
       const orderId = input.order.id;
       flush(orderId); // 同じ注文の、前の保留（「完成」の直後の「渡した」など）は、先に書く
       clearTimeout(timers.get(orderId));
-      const hold: Hold = { orderId, number: input.order.number, ...input, to: patch.status, written: false };
+      const hold: Hold = { orderId, seq: ++seq, number: input.order.number, ...input, to: patch.status, written: false };
       holds.value = [...holds.value.filter((h) => h.orderId !== orderId), hold];
       timers.set(
         orderId,

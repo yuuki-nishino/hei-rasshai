@@ -11,7 +11,7 @@ export function UndoBar() {
   return (
     <>
       {waiting.map((h) => (
-        <div key={h.orderId} class={styles.bar} role="status">
+        <div key={h.seq} class={styles.bar} role="status">
           <p class={styles.message}>
             <strong>{h.number}番</strong>を「{TO_LABEL[h.to]}」にしました
           </p>
