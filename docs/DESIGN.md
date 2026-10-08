@@ -123,6 +123,10 @@ maido-ookini/
 6. `npx firebase deploy -P <dev か prod>`（ルール・インデックス・Hosting。下の「デプロイ」）
 7. 当日までに、スタッフの端末でログインする（C2）
 
+**CLI でできること・できないこと**（本番を作った #23 での実績）：
+- できる：`npx firebase projects:create <ID>`（Spark）、`npx firebase apps:create web <名前> -P <prod>`、`npx firebase apps:sdkconfig WEB <アプリID> -P <prod>`（設定値を取り出して `.env.production` に書く）、`npx firebase deploy -P prod --only firestore`（ルール・インデックス）
+- **できない**：Firestore の作成（`firestore:databases:create` は、プロジェクトで Firestore の API が有効でないと 403 になる。CLI には、API を有効にする手段がない）。**コンソールで作る**と、API の有効化も一緒に行われる（エディションは**スタンダード**、`asia-northeast1`、本番モード）。Google ログインの有効化（サポートメールの選択）と、`creators` の文書の作成も、コンソール
+
 ### デプロイ（#6）
 devは、PRのたびに、手元から行う（のちに GitHub Actions にする）。本番は、イベントの前に、**main から**、手動で行う（ユーザーの明示的な指示があるときだけ）。
 
