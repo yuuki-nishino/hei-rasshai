@@ -42,7 +42,6 @@ export function Catalog() {
 
   return (
     <>
-      <StatusBar connection="online" />
       <Noren title="夏まつり 焼きそば屋" sub="部品の見本（dev だけ）" actions={<Button variant="secondary">メニュー</Button>} />
       <main class={styles.page}>
         <section class={styles.section}>
@@ -118,10 +117,11 @@ export function Catalog() {
         <section class={styles.section}>
           <h2 class={styles.h2}>接続状態</h2>
           <div class={styles.type}>
-            <StatusBar connection="online" />
             <StatusBar connection="pending" pendingCount={3} />
-            <StatusBar connection="pending" />
+            <StatusBar connection="pending" pendingUnknown />
             <StatusBar connection="offline" />
+            <StatusBar connection="offline" pendingCount={2} />
+            <StatusBar connection="offline" pendingUnknown />
           </div>
         </section>
 

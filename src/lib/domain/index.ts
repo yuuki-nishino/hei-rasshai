@@ -14,3 +14,4 @@ export * from './customerView';
 export * from './summary';
 export * from './closing';
 export * from './csv';
+export * from './connection';

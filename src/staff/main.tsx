@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import '../styles/tokens.css';
 import '../styles/base.css';
+import { checkPendingAfterReload } from '../lib/data/writes';
 import { clearCacheOnStart } from '../state/cacheClear';
 import { App } from './App';
 
@@ -15,5 +16,8 @@ if (import.meta.env.MODE !== 'production' && location.hash === '#catalog') {
   void import('./catalog/Catalog').then(({ Catalog }) => render(<Catalog />, root));
 } else {
   // ログアウトで消せなかったキャッシュは、画面を出す前に消す（再読み込みする）。持ち越した消去も試す（data-access.md §8）
-  void clearCacheOnStart().then(() => render(<App />, root));
+  void clearCacheOnStart().then(() => {
+    render(<App />, root);
+    void checkPendingAfterReload(); // 再読み込みの前の未送信が残っていれば、「未送信あり」を出す（data-access.md §6.2）
+  });
 }

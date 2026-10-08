@@ -1,5 +1,6 @@
 // オンライン必須の書き込みの前の確認（data-access.md §3.9）
-import { getDocFromServer, type DocumentReference } from 'firebase/firestore';
+import { disableNetwork, enableNetwork, getDocFromServer, type DocumentReference } from 'firebase/firestore';
+import { db } from '../firebase/staff';
 import { AppError, toAppError } from './errors';
 
 export const ONLINE_CHECK_TIMEOUT_MS = 8000;
@@ -28,5 +29,17 @@ export async function withTimeout<T>(p: Promise<T>, ms = ONLINE_CHECK_TIMEOUT_MS
     return await Promise.race([p, timeout]);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * Firestore に、すぐ再接続させる。通信が戻っても、SDK は再接続を（間隔を空けて）待つため、表示の戻りが遅れる。
+ * ネットワークを一度止めて入れ直すと、待たずに再接続する。未送信の書き込みは、そのまま残る（#19）
+ */
+export async function reconnectNow(): Promise<void> {
+  try {
+    await disableNetwork(db);
+  } finally {
+    await enableNetwork(db).catch(() => {});
   }
 }

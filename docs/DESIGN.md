@@ -175,7 +175,7 @@ Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／
 
 - Firestoreのオフライン永続化を有効にする（`persistentLocalCache` + `persistentMultipleTabManager`）。**スタッフ側のみ**。お客様画面は、メモリキャッシュ
 - 注文の確定はトランザクション（通信必須）。ステータス変更は通常の書き込み（オフラインでも受け付け、復帰後に送られる）
-- 接続状態の表示：オンライン／オフライン／未送信◯件（判定方法は [design/data-access.md](./design/data-access.md) §6）
+- 接続状態の表示：通信が不安定なとき・未送信があるときだけ出す（判定方法は [design/data-access.md](./design/data-access.md) §6）
 - ステータス変更が溜まっている間に、別メンバーが同じ注文を変更した場合は、サーバー側のルール（遷移の検証）で、不正な遷移を拒否する。拒否されたら、スタッフに通知する（再読み込みをまたいだ拒否は、通知できない。既知の制約：[data-access.md](./design/data-access.md) §6.2）
 - 「未送信◯件」は、ローカルの書き込みの `Promise` を、アプリ側で数える（`hasPendingWrites` では、「渡した」「取り消し」の注文が、購読の範囲から外れて数えられないため）
 - ログアウト時と、メンバーでなくなったときは、端末のキャッシュ（IndexedDB）を消す（[data-access.md](./design/data-access.md) §8）
