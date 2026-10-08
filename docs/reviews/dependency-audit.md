@@ -6,6 +6,10 @@
 - 判断の前提：利用者に配信されるのは `dist/`（ブラウザ用のバンドル）だけ。`devDependencies` は、手元とCIの Node.js でのみ動く
 - 見直す時期：Firebase SDK・CLI の更新時と、本番デプロイの前（DESIGN.md §9）
 
+## 2026-10-09（#23：本番デプロイの前の確認。firebase@12.19.0、firebase-tools@15.32.1）
+
+`npm audit`：17件（moderate 5、high 12）。**2026-10-04 の記録と同じ件数・同じ内容**で、新しい指摘はない。本番の依存（`npm audit --omit=dev`）の4件は、すべて `@grpc/grpc-js`（および、それを含む `firebase` 系）で、判断は前回のとおり**影響なし**（ブラウザ版は `grpc` を含まない）。開発用の依存（`firebase-tools`）も同じ。見直す条件（Firebase SDK・CLI の更新時）は、変わらない。
+
 ## 2026-10-04（#2：firebase@12.19.0、firebase-tools@15.32.1 の追加時）
 
 ### 本番の依存（`dependencies`）
