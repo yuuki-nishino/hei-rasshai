@@ -103,6 +103,7 @@ type Unsubscribe = () => void;
 ```ts
 type OrderAction = 'ready' | 'backToPreparing' | 'done' | 'backToReady' | 'cancel' | 'restore';
 ```
+- 「完成」「渡した」は、**画面が、猶予（5秒）の間、`transitionOrder` を呼ばずに保留する**（`state/holdStore.ts`。screens.md §3.5）。`transitionOrder` 自体は、変わらない（猶予が過ぎたとき・すぐ書くときに呼ばれる）
 - `transitionOrder` は、データ設計の遷移表（data-model.md §3）に従って、書き換える項目を決める。**不正な遷移は、書き込む前に `AppError('validation')` を投げる**
 - 計算は `lib/domain/orderStatus.ts`（`transitionPatch`：書き換える項目。できない遷移は `null`）。`'now'` の項目は、`serverTimestamp()` を書く（#15）
 - `transitionOrder` / `changePayment` / `changeNote` は、**呼ぶ画面が**、返した `Promise` を §6 の `trackWrite` に渡す（調理画面の `report`。未送信の数え上げと、拒否の Toast のため。#19）。関数自体は、数えない（`Promise` を返すだけ）
