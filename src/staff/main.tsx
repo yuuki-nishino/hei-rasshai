@@ -9,6 +9,13 @@ import { App } from './App';
 // 読み込むまでは端末の文字で表示し、届いたら切り替わる（visual.md §2）
 void import('@fontsource/zen-kurenaido/400.css');
 
+// Service Worker（オフラインでも開けるように。ADR-0002）。本番のビルドだけ。新しい版は、次の起動で切り替わる
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((e: unknown) => console.error(e));
+  });
+}
+
 const root = document.getElementById('app')!;
 
 // 部品の見本（/#catalog）。本番のビルドには含めない（dev で実機の見た目を確かめるため。visual.md §5）
