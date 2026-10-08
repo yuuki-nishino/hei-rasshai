@@ -4,13 +4,15 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { Button } from '../../components/Button';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Loading } from '../../components/Feedback';
-import { AppError } from '../../lib/data/errors';
 import { changeNote, changePayment, transitionOrder, watchOrdersOfDay } from '../../lib/data/orders';
 import type { Order } from '../../lib/data/types';
-import { trackWrite } from '../../lib/data/writes';
 import { toDay } from '../../lib/domain/day';
+import { isHoldable } from '../../lib/domain/orderHold';
 import { planCancel, sortOrders, type OrderAction } from '../../lib/domain/orderStatus';
 import { selectEvent } from '../../state/event';
+import { flushHold, holds, startHold } from '../../state/hold';
+import { applyHolds } from '../../state/holdStore';
+import { report } from '../../state/kitchenWrite';
 import { activeOrders, activeOrdersError } from '../../state/orders';
 import { showToast } from '../../state/toast';
 import { OrderCard } from './OrderCard';
@@ -19,15 +21,6 @@ import { NoteDialog } from './NoteDialog';
 import { QrDialog } from './QrDialog';
 
 type Column = 'cooking' | 'ready';
-
-/** 書き込みを待たずに進め（未送信として数える）、拒否されたときだけ、番号つきで知らせる（data-access.md §3.5・§6.2） */
-function report(p: Promise<void>, number: number) {
-  trackWrite(p, (e) => {
-    console.error(e);
-    const detail = e instanceof AppError && e.code === 'validation' ? '（いまの状態では、できない操作です）' : '';
-    showToast('error', `${number}番の操作を反映できませんでした${detail}`);
-  });
-}
 
 /** 1分ごとに更新する現在時刻（経過分数の表示用） */
 function useMinuteClock(): number {
@@ -73,9 +66,12 @@ export function KitchenPage({ eventId, uid }: { eventId: string; uid: string }) 
   }, [eventId, showFinished, today, dayRetry]);
 
   const active = activeOrders.value;
-  const cooking = useMemo(() => sortOrders((active?.orders ?? []).filter((o) => o.status === 'preparing')), [active]);
-  const ready = useMemo(() => sortOrders((active?.orders ?? []).filter((o) => o.status === 'ready')), [active]);
-  const finished = useMemo(() => sortOrders((dayOrders ?? []).filter((o) => o.status === 'done' || o.status === 'cancelled')), [dayOrders]);
+  // 「完成」「渡した」の猶予の間は、書かずに、画面の中だけで、状態を進めて見せる（#45）
+  const held = holds.value;
+  const shown = useMemo(() => applyHolds(active?.orders ?? [], held), [active, held]);
+  const cooking = useMemo(() => sortOrders(shown.filter((o) => o.status === 'preparing')), [shown]);
+  const ready = useMemo(() => sortOrders(shown.filter((o) => o.status === 'ready')), [shown]);
+  const finished = useMemo(() => sortOrders(applyHolds(dayOrders ?? [], held).filter((o) => o.status === 'done' || o.status === 'cancelled')), [dayOrders, held]);
 
   if (!active) {
     return activeOrdersError.value ? <p role="alert">注文を読み込めませんでした。通信を確認してください</p> : <Loading label="注文を読み込み中…" />;
@@ -83,7 +79,11 @@ export function KitchenPage({ eventId, uid }: { eventId: string; uid: string }) 
 
   const act = (order: Order, action: OrderAction) => {
     if (action === 'cancel') setCancelling({ id: order.id, number: order.number }); // 取り消しだけ、確認ダイアログ（screens.md §3.5）
-    else report(transitionOrder(eventId, order, action, uid), order.number);
+    else if (isHoldable(action) && startHold({ eventId, uid, order, action })) return; // 猶予の間は書かない（「元に戻す」は UndoBar）
+    else {
+      flushHold(order.id); // 保留中の操作が、先に書かれるように（順序を保つ）
+      report(transitionOrder(eventId, order, action, uid), order.number);
+    }
   };
   const togglePayment = (order: Order) => report(changePayment(eventId, order.id, order.payment === 'cash' ? 'paypay' : 'cash', uid), order.number);
 
@@ -171,8 +171,10 @@ export function KitchenPage({ eventId, uid }: { eventId: string; uid: string }) 
           const target = cancelling;
           setCancelling(null);
           if (!target) return;
-          // 確認を押した時点の、最新の注文で判断する（開いている間に、ほかのメンバーが状態を変えていても、最新の状態から取り消す）
-          const latest = [...(activeOrders.peek()?.orders ?? []), ...(dayOrders ?? [])].find((o) => o.id === target.id);
+          // 確認を押した時点の、最新の注文で判断する（開いている間に、ほかのメンバーが状態を変えていても、最新の状態から取り消す）。
+          // 保留中の操作は、先に書き、その状態から取り消す
+          flushHold(target.id);
+          const latest = applyHolds([...(activeOrders.peek()?.orders ?? []), ...(dayOrders ?? [])], holds.peek()).find((o) => o.id === target.id);
           const plan = planCancel(latest);
           if (plan === 'already') showToast('success', `${target.number}番は、すでに取り消されています`);
           // 画面に出ていない（済みも表示を閉じている間に、ほかのメンバーが「渡した」にした、など）。事実は言い切らない（PR #42 の再レビュー R1）

@@ -3,6 +3,7 @@
 import { signal } from '@preact/signals';
 import { signOut } from '../lib/data/auth';
 import { hasPendingWrites } from '../lib/data/cache';
+import { flushAllHolds } from './hold';
 import { clearCacheForLogout } from './cacheClear';
 import { selectEvent } from './event';
 
@@ -10,6 +11,7 @@ import { selectEvent } from './event';
 export const logoutConfirm = signal(false);
 
 export async function requestLogout(): Promise<void> {
+  flushAllHolds(); // 保留中の「完成」「渡した」は、先に書く（未送信として数えられる）
   if (await hasPendingWrites()) {
     logoutConfirm.value = true;
     return;

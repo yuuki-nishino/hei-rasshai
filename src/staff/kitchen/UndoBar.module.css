@@ -1,0 +1,65 @@
+.bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-2) var(--sp-3) var(--sp-4);
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-ink);
+  color: var(--color-surface);
+  box-shadow: var(--shadow-float);
+  animation: rise var(--dur) ease-out;
+}
+
+.message {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-md);
+}
+
+.undo {
+  flex: none;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  padding-inline: var(--sp-4);
+  border: 2px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 猶予の残り（右から左へ縮む帯）。動きを減らす設定では、止める（残りは、帯の長さでは伝わらないが、文字と「元に戻す」で足りる） */
+.timer {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 4px;
+  background: var(--status-cooking-bg);
+  transform-origin: left;
+  animation-name: drain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes drain {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timer {
+    animation: none;
+  }
+}

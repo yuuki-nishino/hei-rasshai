@@ -23,6 +23,7 @@ import {
 } from '../state/confirm';
 import { statusView } from '../state/connection';
 import { currentEventId, selectEvent } from '../state/event';
+import { flushAllHolds } from '../state/hold';
 import { logoutConfirm, logoutNow, requestLogout } from '../state/logout';
 import { currentEvent } from '../state/myEvents';
 import { activeOrders, subscribeActiveOrders } from '../state/orders';
@@ -37,6 +38,7 @@ import { MenuPage } from './menu/MenuPage';
 import { ConfirmFlowDialog } from './order/ConfirmFlowDialog';
 import { ClosingPage } from './closing/ClosingPage';
 import { KitchenPage } from './kitchen/KitchenPage';
+import { UndoBar } from './kitchen/UndoBar';
 import { OrderPage } from './order/OrderPage';
 import { InvitePanel } from './members/InvitePanel';
 import { SalesPage } from './sales/SalesPage';
@@ -64,6 +66,9 @@ function EventHome() {
   // 調理のタブに、調理中・できあがりの数を出す（新しい注文に気づけるように）
   const waiting = activeOrders.value?.orders.length ?? 0;
   const tabs = TAB_LABELS.map((t) => (t.id === 'kitchen' ? { ...t, badge: waiting } : t));
+
+  // イベントを離れる（一覧へ・切り替え・ログアウト）前に、保留中の「完成」「渡した」を書く（#45）
+  useEffect(() => flushAllHolds, [eventId]);
 
   // イベントに入ったら、前回の確定の途中の記録（pending）が残っていないか確かめる（order-confirm.md §5.3）
   useEffect(() => {
@@ -109,6 +114,7 @@ function EventHome() {
       </main>
 
       <ToastRegion>
+        <UndoBar />
         {toasts.value.map((t) => (
           <Toast key={t.id} kind={t.kind} message={t.message} onClose={() => dismissToast(t.id)} />
         ))}

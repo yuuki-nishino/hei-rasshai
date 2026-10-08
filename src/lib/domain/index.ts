@@ -15,3 +15,4 @@ export * from './summary';
 export * from './closing';
 export * from './csv';
 export * from './connection';
+export * from './orderHold';
