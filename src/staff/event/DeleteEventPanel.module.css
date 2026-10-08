@@ -1,0 +1,57 @@
+.panel {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.h2 {
+  font-family: var(--font-hand);
+  font-size: var(--fs-xl);
+  font-weight: 400;
+  -webkit-text-stroke: var(--hand-bold) currentColor;
+  paint-order: stroke fill;
+}
+
+.note,
+.hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-ink-sub);
+}
+
+.resume {
+  display: grid;
+  gap: var(--sp-3);
+  width: 100%;
+  max-width: 24em;
+}
+
+.status {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+}
+
+.phase {
+  margin: 0;
+  font-weight: 700;
+}
+
+.count {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.error {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  background: var(--status-void-bg);
+  color: var(--status-void-fg);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}

@@ -43,6 +43,7 @@ import { OrderPage } from './order/OrderPage';
 import { InvitePanel } from './members/InvitePanel';
 import { SalesPage } from './sales/SalesPage';
 import { MembersPanel } from './members/MembersPanel';
+import { DeleteEventPanel } from './event/DeleteEventPanel';
 
 // イベントの中の画面。タブ（注文・メニュー・イベント）。Shell（接続状態など）と、ほかのタブは、後のIssueで足す（screens.md §1.2）
 const TAB_LABELS: { id: TabId; label: string }[] = [
@@ -105,6 +106,7 @@ function EventHome() {
             <>
               {event && uid && <MembersPanel eventId={event.id} uid={uid} isOwner={isOwner} />}
               {event && uid && isOwner && <InvitePanel eventId={event.id} uid={uid} />}
+              {event && uid && isOwner && <DeleteEventPanel event={event} uid={uid} />}
               <Button variant="secondary" onClick={() => void requestLogout()}>
                 ログアウト
               </Button>

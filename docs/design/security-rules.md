@@ -26,7 +26,7 @@ Firestore のアクセス制御。データの定義は [data-model.md](./data-m
 | 注文の一覧・検索 | × | × | ○ | ○ |
 | 注文の作成・状態/支払いの更新 | × | × | ○ | ○ |
 | 注文の削除 | × | × | × | ○（イベントの削除中のみ） |
-| 墓標（`voids`）の作成・取得 | × | × | ○ | ○ |
+| 墓標（`voids`）の作成・取得・一覧 | × | × | ○ | ○ |
 | メニューの読み書き（削除を含む） | × | × | ○ | ○ |
 | カウンター・レジ締めの読み書き | × | × | ○（カウンターは+1のみ） | ○ |
 | カウンター・レジ締め・墓標の削除 | × | × | × | ○（イベントの削除中のみ） |
@@ -174,7 +174,8 @@ service cloud.firestore {
 
       // ---------- 墓標（「やめる」で、その注文IDを以後使えなくする） ----------
       match /voids/{orderId} {
-        allow get: if isMember(eventId);
+        // 一覧（list）も許す：イベントの削除（#21）で、オーナーが墓標を数え上げて消すため。中身は、作成者と時刻だけ
+        allow get, list: if isMember(eventId);
         allow create: if isMember(eventId) && isActiveEvent(eventId)
           // 書き込みの後に、注文が無い（同じバッチで、注文と墓標を両方作ることも拒否する）
           && !existsAfter(subPath(eventId, 'orders', orderId))

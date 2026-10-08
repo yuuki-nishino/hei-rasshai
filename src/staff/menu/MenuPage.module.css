@@ -149,7 +149,7 @@
   border: 2px solid var(--color-line);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
-  color: var(--color-text);
+  color: var(--color-ink);
   font-weight: 700;
   font-size: var(--fs-sm);
   cursor: pointer;

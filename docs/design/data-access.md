@@ -54,7 +54,7 @@ type Unsubscribe = () => void;
 | `watchMyEvents(uid, cb: (events: EventDoc[], meta: { fromCache: boolean; memberOf: string[] }) => void, onError): Unsubscribe` | `members` のコレクショングループ（`uid` 一致）を購読し、親のイベントを `getDoc`（**キャッシュも使う**）で取得して一覧にする（開始日の新しい順）。オフラインで起動しても、キャッシュにあるイベントを表示できる（SPEC 7.3）。**孤立の掃除の判定にだけ**、`getDocFromServer` を使う（下記）。`fromCache`：サーバーで確かめていない一覧（0件のとき、画面は「イベントがありません」と言い切らない。#7）。`memberOf`：自分の `members` があるイベントのID（表示できないものも含む。選んでいるイベントから外れたかの判定に使う。PR #32 のレビュー E1）。親のイベントは1回だけ取るため、イベントの変更（名前・削除中）は、購読し直すまで反映されない。画面は、一覧に戻るたびに購読し直す（screens.md §3.2） |
 | `createEvent(input, user): Promise<string>` | **オンライン必須**（[§3.9](#39-オンライン必須の書き込み)）。イベント（`deleting = false`）＋オーナーの `members` を、1バッチで作成。`eventId` を返す。`displayName` は §3.9 の規則 |
 | `updateEvent(eventId, patch): Promise<void>` | 名前・日付・準備金 |
-| `deleteEventDeep(eventId, onProgress): Promise<void>` | **オンライン必須**。配下を削除（[§7](#7-イベント削除)） |
+| `deleteEventDeep(eventId, uid, onProgress): Promise<void>` | **オンライン必須**（オーナーのみ。`uid` は自分）。配下を削除（[§7](#7-イベント削除)）。同じ呼び出しで再開できる。`onProgress({ phase, deleted })`：段階と、ここまでに消した件数 |
 | `joinEvent(eventId, user): Promise<'joined' \| 'already'>` | **オンライン必須**。すでにメンバーなら何もしない（`'already'`）。そうでなければ、メンバー作成＋招待の削除（1バッチ）。最初の確認は、`members/{uid}` の `getDocFromServer`（`permission-denied` は「メンバーではない」と判断する。この取得がオンラインの確認を兼ね、8秒で応答がなければ `offline`）。招待が無い・期限切れ・別のアカウント・削除中のイベントは、`permission`。ただし、バッチが `permission` で失敗したときは、`members/{uid}` をもう一度だけサーバーで確かめ、あれば `'already'`（前回の時間切れの送信待ちが、確認の後に先に通った場合。[PR #33 の再レビュー](../reviews/pr-33-invite-join-review.md) J2）。`displayName` は §3.9 の規則 |
 
 **`watchMyEvents` の孤立の掃除（自分の `members` の削除）の条件**（判定は `lib/data/myEvents.ts` の `resolveMyEvents`。Firestore に依存させず、単体テストで全分岐を確かめる。#7）
@@ -232,8 +232,14 @@ Cloud Functions を使わないため、**オーナーの端末から、配下�
 - 途中で止まった場合（`deleting = true` のまま）の画面での扱いは、screens.md §3.2・§3.9。同じ操作（「削除を再開」）で、続きから消せる
 - 5の後で止まった場合、自分の `members` だけが残る → `watchMyEvents` が、サーバーでイベントが無いことを確認し、削除する
 - 進捗（削除した件数）を表示する。**確認は、イベント名の入力**で行う
+- **墓標（`voids`）の一覧を読めるように、ルールを足した**（#21）。それまでは `get` だけで、`list` が拒否され、オーナーが墓標を数え上げて消せなかった（メンバーだけが読める。中身は、作成者と時刻だけ）
+- **#21 の実装**（`lib/data/eventDelete.ts`、`state/eventDelete.ts`、`staff/event/DeleteEventPanel.tsx`）
+  - 消す単位は、450件ずつ（`DELETE_BATCH`）。毎回サーバーから読み直す（`getDocsFromServer`）ため、途中で止まって再実行しても、残りだけを消す。読み取りは15秒、書き込みは30秒で応答がなければ、それぞれ `offline`・`timeout`
+  - 手順1で、イベントを読む（通信の確認を兼ねる）。イベントが無ければ（手順5〜6の間で止まった）、手順6だけを行う。`ownerUid` が自分でなければ `permission`
+  - 手順5の「空の確認」は、配下の5つのコレクション、`invites`、`members`（自分だけ）。残っていれば、3〜4をやり直す（最大3回。他の端末が書き続けるなど、終わらないときは `conflict`）
+  - 画面の状態は `state/eventDelete.ts`（実行中・止まった・待機）。イベントのタブにも、削除中の画面にも、同じ状態を出す。始める前に、保留中の「完成」「渡した」を書く（`flushAllHolds`）。終われば、一覧へ戻る
 - 1日の削除の無料枠は2万件。それを超える規模は、想定しない
-- ★U4：数千件の削除にかかる時間と、途中で失敗したときの動作を、実機で確認する
+- ★U4：数千件の削除にかかる時間と、途中で失敗したときの動作を、実機で確認する。**結果**：Emulator で、注文3,000件（ほか数件）の削除は 6.4 秒（手元。通信の遅れを含まない）。途中で止めて再実行すれば完了する（結合テスト）。実際の通信での時間は、devで確認する（testing.md §5）
 
 ## 8. ログアウトとキャッシュの消去
 

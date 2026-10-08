@@ -1,9 +1,11 @@
 // 墓標のルール（testing.md §3：24〜27。ADR-0004）
 import { assertFails, assertSucceeds, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import {
+  collection,
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   runTransaction,
   serverTimestamp,
   setDoc,
@@ -69,6 +71,12 @@ describe('墓標の作成・読み取り', () => {
     const db = as(env, ALICE);
     await assertSucceeds(setDoc(doc(db, 'events/e1/voids/o2'), voidData(ALICE)));
     await assertSucceeds(getDoc(doc(db, 'events/e1/voids/o2')));
+  });
+
+  it('メンバーは、墓標の一覧を読める（イベントの削除で数え上げる。#21）。メンバーでない人は読めない', async () => {
+    await assertSucceeds(getDocs(collection(as(env, ALICE), 'events/e1/voids')));
+    await assertFails(getDocs(collection(as(env, BOB), 'events/e1/voids')));
+    await assertFails(getDocs(collection(anon(env), 'events/e1/voids')));
   });
 
   it('余計な項目、createdAt がクライアントの時刻、createdBy が他人なら拒否', async () => {
