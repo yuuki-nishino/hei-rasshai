@@ -210,10 +210,10 @@ Spark無料枠：読み取り5万／日、書き込み2万／日、削除2万／
 
 | # | 内容 | 確認する場面 |
 |---|---|---|
-| U1 | Googleログイン（popup / redirect、`authDomain`）。Safariのタブはマイルストーン1、ホーム画面アプリは、追加を勧める前に確認 | マイルストーン1・7、実機。**Safariのタブ：#5 で確認済み（ポップアップに決定。§6）**。ホーム画面アプリは M7 |
+| U1 | Googleログイン（popup / redirect、`authDomain`）。Safariのタブはマイルストーン1、ホーム画面アプリは、追加を勧める前に確認 | マイルストーン1・7、実機。**Safariのタブ：#5 で確認済み（ポップアップに決定。§6）**。ホーム画面アプリは **#20 で確認済み**（dev の iPhone で、ホーム画面に追加したアプリから、Googleログインができた。ポップアップのまま、リダイレクトは不要）。**追加を勧めてよい**（ただし任意。ADR-0002） |
 | U4 | イベント削除（Cloud Functionsなしで、配下を消す）の件数・時間・中断時の動作 | マイルストーン8 |
 | R1〜R11 | ルールの検証項目（[security-rules.md](./design/security-rules.md) §5）。**R8（墓標の排他）が、確定フローの安全性の要** | マイルストーン1・Emulator |
-| W1 | Service Workerと `/s` の関係（お客様画面に影響しないこと） | マイルストーン5・7。**`/s` の配信は #6 で確認済み**（dev で、`/s`・`/s?e=…&o=…` がお客様用の `customer.html` を、`/join` などそれ以外がスタッフ用の `index.html` を返す。ヘッダーも付く）。Service Worker との関係は M7 |
+| W1 | Service Workerと `/s` の関係（お客様画面に影響しないこと） | マイルストーン5・7。**`/s` の配信は #6 で確認済み**（dev で、`/s`・`/s?e=…&o=…` がお客様用の `customer.html` を、`/join` などそれ以外がスタッフ用の `index.html` を返す。ヘッダーも付く）。**Service Worker との関係は #20 で確認済み**（dev の iPhone で、Service Worker 導入済みの端末が、機内モードで、スタッフ画面を開け、`/s` は「ページを開けません」（通信エラー）になる＝毎回ネットワークから読む。ビルド後の検査も `scripts/build.mjs` に入れた） |
 | W2 | `frame-ancestors 'self'` が、Googleログインに影響しないこと | マイルストーン1・実機。**#5 で確認済み（ポップアップ。§6）** |
 | F1 | お客様画面の初回JavaScriptが、gzip後200KB以下か（Firestore SDKの大きさ）。#2の時点で、Preact＋Firestore（メモリキャッシュ・`getDoc` 1回）で、約137KB | **確認済み（#16）**：画面と `onSnapshot` を含めて、gzip後 約135KB（`customer.html` が読み込む JavaScript の合計。上限 200KB に対して余裕あり）。以後、ビルドが、200KB を超えたら失敗する（`scripts/build.mjs`）。低速回線での表示時間は、実機で確かめる（testing.md §5） |
 | N1 | 接続状態の推定（`fromCache` が10秒続いたらオフライン）が、実機で、遅すぎ・早すぎないか | **確認済み（#19）**：オフラインになるのは早く、問題なし。オンラインへの戻りは、SDK の再接続待ちで遅れたため、`online` イベントで数え直し、`reconnectNow()` ですぐ再接続させるようにして解消（data-access.md §6.1）。10秒のまま変えない |
