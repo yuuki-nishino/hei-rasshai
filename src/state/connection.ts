@@ -37,7 +37,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     if (fromCacheSince.value === null) return; // 購読していない、または、サーバーに届いている
     startFromCache();
-    void reconnectNow();
+    reconnectNow().catch((e: unknown) => console.error(e)); // 失敗しても、表示の判定は続く（PR #48 の再レビュー R1）
   });
 }
 
