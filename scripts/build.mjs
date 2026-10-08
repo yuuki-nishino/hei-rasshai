@@ -44,3 +44,13 @@ console.log(`お客様画面の初回の JavaScript：gzip後 ${(bytes / 1024).t
 if (scripts.length === 0 || bytes > CUSTOMER_JS_LIMIT) {
   throw new Error(`お客様画面の初回の JavaScript が、gzip後 ${(bytes / 1024).toFixed(1)}KB です（上限 ${CUSTOMER_JS_LIMIT / 1024}KB）。内容を見直してください（DESIGN.md ★F1）`);
 }
+
+// Service Worker が、お客様画面（/s）に影響しないか（ADR-0002、DESIGN.md ★W1）。事前キャッシュにお客様用のファイルが入っていたり、
+// /s へのナビゲーションを index.html に置き換える設定が欠けていたら、ビルドを失敗させる
+const sw = readFileSync('dist/sw.js', 'utf8');
+const precached = [...sw.matchAll(/url:\s*"([^"]+)"/g)].map((m) => m[1]);
+const leaked = precached.filter((u) => /customer/.test(u));
+if (precached.length === 0) throw new Error('dist/sw.js の事前キャッシュが空です');
+if (leaked.length > 0) throw new Error(`Service Worker の事前キャッシュに、お客様用のファイルがあります：${leaked.join(', ')}`);
+if (!/denylist/.test(sw) || !sw.includes('^\\/s(\\/|\\?|$)')) throw new Error('Service Worker のナビゲーションから、/s が除外されていません（DESIGN.md ★W1）');
+console.log(`Service Worker：事前キャッシュ ${precached.length} 件。お客様画面（/s）は対象外`);

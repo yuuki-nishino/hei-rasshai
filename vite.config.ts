@@ -2,6 +2,7 @@
 import { resolve } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import preact from '@preact/preset-vite';
+import { VitePWA } from 'vite-plugin-pwa';
 
 // ビルドは、スタッフ用とお客様用を、別々に行う（DESIGN.md §4.3）。
 // 1回のビルドで2つの入口を作ると、Firestore SDK が共有チャンクになり、
@@ -29,8 +30,49 @@ function customerBundleGuard(): Plugin {
   };
 }
 
+// Service Worker とホーム画面への追加（manifest）は、スタッフ用のビルドだけに入れる（ADR-0002、DESIGN.md §8）。
+// - 登録は src/staff/main.tsx（本番のビルドだけ。開発サーバーでは入れない）
+// - 新しい版は、裏で取得して待機させ、次の起動で切り替える（skipWaiting・clientsClaim を使わない）
+// - お客様画面（/s）：ナビゲーションのフォールバックから外し、事前キャッシュにも入れない（★W1）。scripts/build.mjs が、ビルド後に検査する
+function staffPwa(): Plugin[] {
+  return VitePWA({
+    injectRegister: false,
+    registerType: 'prompt',
+    manifest: {
+      name: '毎度おおきに',
+      short_name: '毎度おおきに',
+      lang: 'ja',
+      start_url: '/',
+      scope: '/',
+      display: 'standalone',
+      theme_color: '#a63a24',
+      background_color: '#f5f0e6',
+      icons: [
+        { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    },
+    workbox: {
+      // アプリ本体（HTML・JS・CSS・アイコン）を事前キャッシュする。手書きの文字（woff2。使った分だけ）は、下の実行時キャッシュ。古い形式（woff）は入れない
+      globPatterns: ['**/*.{html,js,css,png,webmanifest}'],
+      globIgnores: ['customer.html', 'assets/customer-*'],
+      navigateFallback: '/index.html',
+      navigateFallbackDenylist: [/^\/s(\/|\?|$)/, /^\/customer\.html/, /^\/__\//],
+      cleanupOutdatedCaches: true,
+      runtimeCaching: [
+        {
+          urlPattern: ({ url }) => /^\/assets\/zen-kurenaido-.*\.woff2$/.test(url.pathname),
+          handler: 'CacheFirst',
+          options: { cacheName: 'fonts', expiration: { maxEntries: 60 } },
+        },
+      ],
+    },
+  });
+}
+
 export default defineConfig({
-  plugins: [preact(), ...(target === 'customer' ? [customerBundleGuard()] : [])],
+  plugins: [preact(), ...(target === 'customer' ? [customerBundleGuard()] : staffPwa())],
   build: {
     emptyOutDir: target === 'staff',
     rollupOptions: {
