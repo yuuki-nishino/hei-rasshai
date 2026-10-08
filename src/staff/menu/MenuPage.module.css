@@ -142,6 +142,33 @@
   color: var(--status-void-fg);
 }
 
+/* 調理の要否：調理なし（グッズなど）のときだけ、色を付けて目立たせる */
+.cookToggle {
+  min-height: var(--tap-min);
+  padding: 0 var(--sp-3);
+  border: 2px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.cookToggle[data-nocook='true'] {
+  border-color: var(--status-done-fg);
+  background: var(--status-done-bg);
+  color: var(--status-done-fg);
+}
+
+.cookCheck {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
 .spacer {
   flex: 1;
 }

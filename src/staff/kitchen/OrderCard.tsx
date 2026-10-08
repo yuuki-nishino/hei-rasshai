@@ -3,6 +3,7 @@ import { Button } from '../../components/Button';
 import { PaymentBadge, StatusBadge } from '../../components/Badge';
 import type { Order } from '../../lib/data/types';
 import { ACTION_LABEL, availableActions, dayMark, elapsedMinutes, type OrderAction } from '../../lib/domain/orderStatus';
+import { needsCooking } from '../../lib/domain/cooking';
 import { formatYen } from '../../lib/domain/order';
 import styles from './OrderCard.module.css';
 
@@ -40,8 +41,11 @@ export function OrderCard({ order, today, now, onAction, onTogglePayment, onQr, 
 
       <ul class={styles.items} aria-label="品目">
         {order.items.map((i) => (
-          <li key={i.menuId} class={styles.item}>
-            <span class={styles.itemName}>{i.name}</span>
+          <li key={i.menuId} class={`${styles.item} ${needsCooking(i) ? '' : styles.noCook}`}>
+            <span class={styles.itemName}>
+              {i.name}
+              {!needsCooking(i) && <span class={styles.noCookTag}>調理なし</span>}
+            </span>
             <span class={styles.qty}>× {i.qty}</span>
           </li>
         ))}

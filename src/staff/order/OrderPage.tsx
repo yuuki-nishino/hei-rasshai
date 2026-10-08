@@ -112,11 +112,12 @@ function MenuButton({ item, qty, onAdd }: { item: MenuItem; qty: number; onAdd: 
       class={`${styles.menuItem} ${qty > 0 ? styles.inCart : ''}`}
       disabled={item.soldOut}
       onClick={onAdd}
-      aria-label={`${item.name} ${formatYen(item.price)}${item.soldOut ? '（売り切れ）' : qty > 0 ? `（カートに${qty}）` : ''}`}
+      aria-label={`${item.name} ${formatYen(item.price)}${item.cook ? '' : '（調理なし）'}${item.soldOut ? '（売り切れ）' : qty > 0 ? `（カートに${qty}）` : ''}`}
     >
       <span class={styles.menuName}>{item.name}</span>
       <span class={styles.menuPrice}>{formatYen(item.price)}</span>
       {item.soldOut && <span class={styles.soldOutLabel}>売り切れ</span>}
+      {!item.cook && <span class={styles.noCookLabel}>調理なし</span>}
       {qty > 0 && (
         <span class={styles.qtyBadge} aria-hidden="true">
           {qty}

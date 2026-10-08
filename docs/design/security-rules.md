@@ -92,10 +92,11 @@ service cloud.firestore {
     }
 
     function validMenu(d) {
-      return d.keys().hasOnly(['name', 'price', 'order', 'soldOut'])
+      return d.keys().hasOnly(['name', 'price', 'order', 'soldOut', 'cook'])
           && d.name is string && d.name.size() >= 1 && d.name.size() <= 40
           && d.price is int && d.price >= 1 && d.price <= 100000
-          && d.order is number && d.soldOut is bool;
+          && d.order is number && d.soldOut is bool
+          && d.get('cook', true) is bool; // 調理が必要か（#52）。無い（古い）商品も、通る
     }
 
     function validClosing(d, day) {

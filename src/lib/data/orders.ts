@@ -38,7 +38,7 @@ export function toOrder(snap: DocumentSnapshot): Order {
     id: snap.id,
     number: d.number,
     day: d.day,
-    items: (d.items as OrderLine[]).map((i) => ({ menuId: i.menuId, name: i.name, price: i.price, qty: i.qty })),
+    items: (d.items as OrderLine[]).map((i) => ({ menuId: i.menuId, name: i.name, price: i.price, qty: i.qty, ...(i.cook === false ? { cook: false } : {}) })),
     total: d.total,
     payment: d.payment,
     note: typeof d.note === 'string' ? d.note : '', // 無い注文（#40 より前）は、空
@@ -89,7 +89,7 @@ async function confirmOnce(eventId: string, ctx: ConfirmContext, uid: string): P
   const counterRef = doc(db, 'events', eventId, 'counters', ctx.day);
   const { items, total, payment, qr } = ctx.draft;
   const note = ctx.draft.note ?? ''; // 古い pending（メモの項目なし）は、空
-  const lines = items.map((i) => ({ menuId: i.menuId, name: i.name, price: i.price, qty: i.qty }));
+  const lines = items.map((i) => ({ menuId: i.menuId, name: i.name, price: i.price, qty: i.qty, ...(i.cook === false ? { cook: false } : {}) }));
   try {
     const result = await runTransaction(db, async (tx) => {
       const o = await tx.get(orderRef);

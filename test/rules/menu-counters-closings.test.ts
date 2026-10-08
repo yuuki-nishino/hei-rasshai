@@ -58,6 +58,14 @@ describe('メニュー', () => {
     await assertSucceeds(deleteDoc(doc(db, 'events/e1/menu/m1')));
   });
 
+  it('調理の要否（cook）は、無くても（古い商品）、true・false でも通り、あとから変えられる（#52）', async () => {
+    const db = as(env, ALICE);
+    await assertSucceeds(setDoc(doc(db, 'events/e1/menu/m2'), menuItem({ cook: false })));
+    await assertSucceeds(setDoc(doc(db, 'events/e1/menu/m3'), menuItem({ cook: true })));
+    await assertSucceeds(updateDoc(doc(db, 'events/e1/menu/m1'), { cook: false })); // m1 は cook の無い古い形
+    await assertSucceeds(updateDoc(doc(db, 'events/e1/menu/m1'), { cook: true }));
+  });
+
   it('価格の境界：1円と100,000円は許可', async () => {
     const db = as(env, ALICE);
     await assertSucceeds(setDoc(doc(db, 'events/e1/menu/m2'), menuItem({ price: 1 })));
@@ -73,6 +81,7 @@ describe('メニュー', () => {
     ['名前が41文字', { name: 'あ'.repeat(41) }],
     ['order が文字列', { order: '10' }],
     ['soldOut が真偽値でない', { soldOut: 0 }],
+    ['cook が真偽値でない', { cook: 'no' }],
     ['余計な項目', { memo: 'x' }],
   ])('49：%s は拒否', async (_label, patch) => {
     const db = as(env, ALICE);

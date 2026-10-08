@@ -26,6 +26,8 @@ export interface OrderLine {
   name: string;
   price: number;
   qty: number;
+  /** 調理が必要か（#52）。無い（古い）行は、調理あり */
+  cook?: boolean;
 }
 
 /** 注文（data-model.md §2.6）。時刻は、書き込み直後（サーバー時刻の確定前）に null になり得る */
@@ -58,6 +60,8 @@ export interface MenuItem {
   price: number;
   order: number;
   soldOut: boolean;
+  /** 調理が必要か（#52）。グッズなどは false。無い（古い）商品は true */
+  cook: boolean;
 }
 
 /** レジ締め（data-model.md §2.8。closings/{day}） */

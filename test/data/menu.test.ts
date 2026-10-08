@@ -74,7 +74,19 @@ describe('追加・更新・削除', () => {
     const items = await watchUntil((i) => i.length === 2).result;
     await addMenuItem('e1', { name: 'ラムネ', price: 200 }, items);
     const after = await watchUntil((i) => i.length === 3).result;
-    expect(after[2]).toMatchObject({ name: 'ラムネ', price: 200, order: 45, soldOut: false });
+    expect(after[2]).toMatchObject({ name: 'ラムネ', price: 200, order: 45, soldOut: false, cook: true });
+  });
+
+  it('調理の要否（#52）：追加のとき指定できる。cook の無い古い商品は true。あとから変えられる', async () => {
+    await seed({ a: { name: '焼きそば', price: 500, order: 10 } }); // cook の項目なし
+    setUser(ALICE);
+    const items = await watchUntil((i) => i.length === 1).result;
+    expect(items[0]?.cook).toBe(true);
+    await addMenuItem('e1', { name: 'Tシャツ', price: 3000, cook: false }, items);
+    const after = await watchUntil((i) => i.length === 2).result;
+    expect(after.find((i) => i.name === 'Tシャツ')?.cook).toBe(false);
+    await updateMenuItem('e1', 'a', { cook: false });
+    expect((await watchUntil((i) => i.find((x) => x.id === 'a')?.cook === false).result).find((x) => x.id === 'a')?.cook).toBe(false);
   });
 
   it('追加も、名前・価格を検査する（不正なら書かない）', async () => {
@@ -87,7 +99,7 @@ describe('追加・更新・削除', () => {
   it('100件を超える追加は、validation で拒否（書かない）', async () => {
     await seed();
     setUser(ALICE);
-    const full = Array.from({ length: 100 }, (_, k) => ({ id: `m${k}`, name: 'x', price: 1, order: k, soldOut: false }));
+    const full = Array.from({ length: 100 }, (_, k) => ({ id: `m${k}`, name: 'x', price: 1, order: k, soldOut: false, cook: true }));
     await expect(addMenuItem('e1', { name: 'y', price: 1 }, full)).rejects.toMatchObject({ code: 'validation' });
   });
 
@@ -136,7 +148,7 @@ describe('addMenuItemsBulk（#11）', () => {
   it('合計が100件を超えるなら、1件も書かない（validation）', async () => {
     await seed();
     setUser(ALICE);
-    const items = Array.from({ length: 99 }, (_, k) => ({ id: `m${k}`, name: 'x', price: 1, order: k, soldOut: false }));
+    const items = Array.from({ length: 99 }, (_, k) => ({ id: `m${k}`, name: 'x', price: 1, order: k, soldOut: false, cook: true }));
     const lines = [
       { line: 1, name: 'a', price: 1 },
       { line: 2, name: 'b', price: 1 },
