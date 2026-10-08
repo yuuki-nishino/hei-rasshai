@@ -155,7 +155,7 @@
   cursor: pointer;
 }
 
-.cookToggle[aria-pressed='true'] {
+.cookToggle[data-nocook='true'] {
   border-color: var(--status-done-fg);
   background: var(--status-done-bg);
   color: var(--status-done-fg);

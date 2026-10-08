@@ -26,7 +26,7 @@ interface EventDoc { id: string; name: string; startDate: Day; endDate: Day; flo
 interface Member { uid: string; role: 'owner' | 'member'; displayName: string; email: string }
 interface Invite { email: string; createdAt: Date | null; expiresAt: Date | null } // expiresAt = createdAt + 1日（画面表示用に計算）
 interface MenuItem { id: string; name: string; price: number; order: number; soldOut: boolean; cook: boolean }
-interface OrderLine { menuId: string; name: string; price: number; qty: number }
+interface OrderLine { menuId: string; name: string; price: number; qty: number; cook?: boolean }
 interface Order {
   id: string; number: number; day: Day; items: OrderLine[]; total: number;
   payment: Payment; status: OrderStatus; cancelledFrom: Exclude<OrderStatus, 'cancelled'> | null;

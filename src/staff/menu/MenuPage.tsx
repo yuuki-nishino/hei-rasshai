@@ -297,8 +297,8 @@ function MenuRow({ item, first, last, onUpdate, onMove, onDelete }: RowProps) {
         <button
           type="button"
           class={styles.cookToggle}
-          aria-label={`${item.name}の調理の要否`}
-          aria-pressed={!item.cook}
+          aria-label={`${item.name}は調理${item.cook ? 'あり' : 'なし'}。押すと切り替え`}
+          data-nocook={!item.cook}
           onClick={() => onUpdate({ cook: !item.cook })}
         >
           {item.cook ? '調理あり' : '調理なし'}
