@@ -12,6 +12,8 @@ export interface CartLine {
   name: string;
   price: number;
   qty: number;
+  /** 調理が必要か（#52）。false のときだけ書く（無い行は、調理あり） */
+  cook?: boolean;
 }
 
 /** カートの計算に使う、メニューの最小限の形 */
@@ -20,6 +22,7 @@ export interface CartMenuItem {
   name: string;
   price: number;
   soldOut: boolean;
+  cook?: boolean;
 }
 
 /** 合計：Σ price × qty（カートの保持する価格。保存される items と、必ず一致する） */
@@ -30,6 +33,11 @@ export function calcTotal(lines: readonly Pick<CartLine, 'price' | 'qty'>[]): nu
 /** お釣り：お預り − 合計。負なら不足 */
 export function calcChange(total: number, tendered: number): number {
   return tendered - total;
+}
+
+/** カートの新しい行。cook は、調理なしのときだけ持つ */
+function cartLineOf(item: CartMenuItem): CartLine {
+  return { menuId: item.id, name: item.name, price: item.price, qty: 1, ...(item.cook === false ? { cook: false } : {}) };
 }
 
 export type CartAddResult = { ok: true; lines: CartLine[] } | { ok: false; reason: 'soldOut' | 'qtyMax' | 'linesMax' };
@@ -46,7 +54,7 @@ export function addToCart(lines: readonly CartLine[], item: CartMenuItem): CartA
     return { ok: true, lines: lines.map((l, k) => (k === i ? { ...l, qty: l.qty + 1 } : l)) };
   }
   if (lines.length >= ORDER_LINES_MAX) return { ok: false, reason: 'linesMax' };
-  return { ok: true, lines: [...lines, { menuId: item.id, name: item.name, price: item.price, qty: 1 }] };
+  return { ok: true, lines: [...lines, cartLineOf(item)] };
 }
 
 /** 数量の増減。0以下になったら行を消す。99を超えない */
@@ -78,7 +86,7 @@ export function lineNotice(line: CartLine, menu: readonly CartMenuItem[]): LineN
 /** 「現在の価格にする」：その行の名前・価格を、いまのメニューに合わせる */
 export function applyCurrentPrice(lines: readonly CartLine[], menuId: string, menu: readonly CartMenuItem[]): CartLine[] {
   const m = menu.find((x) => x.id === menuId);
-  return m ? lines.map((l) => (l.menuId === menuId ? { ...l, name: m.name, price: m.price } : l)) : [...lines];
+  return m ? lines.map((l) => (l.menuId === menuId ? { ...cartLineOf(m), qty: l.qty } : l)) : [...lines];
 }
 
 /** お預りの入力：0以上の整数（全角数字・3桁ごとのカンマ・「円」「¥」を受け付ける）。空は0。不正なら null */

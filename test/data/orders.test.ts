@@ -107,6 +107,20 @@ describe('confirmOrder', () => {
     expect(await findOrderOnServer('e1', withQr)).toMatchObject({ status: 'preparing', number: 2, total: 1000, createdBy: ALICE });
   });
 
+  it('調理の要否（#52）：調理なしの行は cook: false で保存され、読み戻せる。調理ありの行は項目を持たない', async () => {
+    setUser(ALICE);
+    const id = newOrderId('e1');
+    const items = [
+      { menuId: 'y', name: '焼きそば', price: 500, qty: 1 },
+      { menuId: 'g', name: 'Tシャツ', price: 3000, qty: 1, cook: false },
+    ];
+    const o = await confirmOrder('e1', ctxOf(id, { draft: { items, total: 3500, payment: 'cash', qr: true } }), ALICE);
+    expect(o.items).toEqual(items);
+    const saved = await findOrderOnServer('e1', id);
+    expect(saved?.items).toEqual(items);
+    expect(saved?.items[0]).not.toHaveProperty('cook');
+  });
+
   it('#12：オフラインでは、失敗する（offline）。注文は作られない', async () => {
     // disableNetwork はトランザクションの通信を止めないため、つながらない宛先で試す（helpers.ts の setUnreachableUser）
     setUnreachableUser(ALICE);

@@ -81,6 +81,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 調理なし（グッズなど）。売り切れの赤とは別の色にする */
+.noCookLabel {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--status-done-fg);
+}
+
 .soldOutLabel {
   font-size: var(--fs-xs);
   font-weight: 700;

@@ -82,6 +82,21 @@
   line-height: var(--lh-tight);
 }
 
+/* 調理が要らない商品（グッズなど）：薄くして、作るものが目に入るようにする */
+.noCook {
+  opacity: 0.55;
+}
+
+.noCookTag {
+  margin-left: var(--sp-2);
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid currentColor;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .itemName {
   overflow-wrap: anywhere;
 }

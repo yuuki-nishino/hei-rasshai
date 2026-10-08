@@ -1,5 +1,5 @@
 // 注文のカート（screens.md §3.4）。タブを切り替えても消えないよう、メモリ上の共有の状態に置く（再読み込みでは消える）。
-// イベントを変えたら空にする。QRの発行の選択は、hei:qr に保存する
+// イベントを変えたら空にする。QRの発行は、カートの中身から自動で決める（調理が必要な商品があればオン。#52）。手で変えたら、その選択を使う
 import { computed, effect, signal } from '@preact/signals';
 import type { Payment } from '../lib/data/types';
 import {
@@ -12,8 +12,8 @@ import {
   type CartLine,
   type CartMenuItem,
 } from '../lib/domain/order';
+import { defaultQr } from '../lib/domain/cooking';
 import { currentEventId } from './event';
-import { readStorage, writeStorage } from './storage';
 
 export const cartLines = signal<CartLine[]>([]);
 export const payment = signal<Payment>('cash');
@@ -21,18 +21,26 @@ export const payment = signal<Payment>('cash');
 export const tenderedText = signal('');
 /** メモの入力（文字のまま。normalizeNote で整える） */
 export const noteText = signal('');
-export const qr = signal(readStorage('hei:qr') !== 'false'); // 初期値は「発行する」
+/** QRの手での選択（null＝自動）。カートの「調理が必要か」が変わったときと、カートを空にしたときに、自動へ戻す */
+const qrChoice = signal<boolean | null>(null);
+export const qr = computed(() => qrChoice.value ?? defaultQr(cartLines.value));
 
 export const cartTotal = computed(() => calcTotal(cartLines.value));
 
 export function setQr(on: boolean): void {
-  qr.value = on;
-  writeStorage('hei:qr', String(on));
+  qrChoice.value = on;
 }
 
-/** カートを空にする（クリア・確定の後・イベントの切り替え）。QR の選択は残す */
+/** カートの行を置き換える。調理が必要かどうかが変わったら、QRの選択を自動へ戻す（食べ物を足したのに、QRなしのまま、にならないように） */
+function setLines(next: CartLine[]): void {
+  if (defaultQr(cartLines.peek()) !== defaultQr(next)) qrChoice.value = null;
+  cartLines.value = next;
+}
+
+/** カートを空にする（クリア・確定の後・イベントの切り替え） */
 export function clearCart(): void {
   cartLines.value = [];
+  qrChoice.value = null;
   payment.value = 'cash';
   tenderedText.value = '';
   noteText.value = '';
@@ -50,21 +58,21 @@ effect(() => {
 // カートの操作（画面から呼ぶ）
 export function addItemToCart(item: CartMenuItem): CartAddResult {
   const r = addToCart(cartLines.peek(), item);
-  if (r.ok) cartLines.value = r.lines;
+  if (r.ok) setLines(r.lines);
   return r;
 }
 
 export function changeLineQty(menuId: string, delta: number): void {
-  cartLines.value = changeQty(cartLines.peek(), menuId, delta);
+  setLines(changeQty(cartLines.peek(), menuId, delta));
 }
 
 export function removeCartLine(menuId: string): void {
-  cartLines.value = removeLine(cartLines.peek(), menuId);
+  setLines(removeLine(cartLines.peek(), menuId));
 }
 
 /** 「現在の価格にする」 */
 export function applyLineCurrentPrice(menuId: string, menu: readonly CartMenuItem[]): void {
-  cartLines.value = applyCurrentPrice(cartLines.peek(), menuId, menu);
+  setLines(applyCurrentPrice(cartLines.peek(), menuId, menu));
 }
 
 export function setPayment(p: Payment): void {

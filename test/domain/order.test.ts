@@ -6,8 +6,10 @@ import {
   calcChange,
   calcTotal,
   changeQty,
+  defaultQr,
   formatYen,
   lineNotice,
+  needsCooking,
   parseTendered,
   removeLine,
   TENDERED_MAX,
@@ -57,6 +59,31 @@ describe('addToCart', () => {
     expect(addToCart([{ menuId: 'y', name: '焼きそば', price: 500, qty: 99 }], yakisoba)).toEqual({ ok: false, reason: 'qtyMax' });
     const fifty = Array.from({ length: 50 }, (_, k) => ({ menuId: `m${k}`, name: 'x', price: 1, qty: 1 }));
     expect(addToCart(fifty, yakisoba)).toEqual({ ok: false, reason: 'linesMax' });
+  });
+});
+
+describe('調理の有無（#52）', () => {
+  const goods = { id: 'g', name: 'Tシャツ', price: 3000, soldOut: false, cook: false };
+  it('調理なしの商品は、行に cook: false を持つ。調理ありは持たない（古い行と同じ形）', () => {
+    const r = addToCart([], goods);
+    expect(r).toEqual({ ok: true, lines: [{ menuId: 'g', name: 'Tシャツ', price: 3000, qty: 1, cook: false }] });
+    expect(addToCart([], { ...yakisoba, cook: true })).toEqual({ ok: true, lines: [{ menuId: 'y', name: '焼きそば', price: 500, qty: 1 }] });
+  });
+  it('needsCooking：cook が false のときだけ不要。無い行は調理あり', () => {
+    expect(needsCooking({})).toBe(true);
+    expect(needsCooking({ cook: true })).toBe(true);
+    expect(needsCooking({ cook: false })).toBe(false);
+  });
+  it('defaultQr：調理ありが1つでもあればオン。調理なしだけならオフ。空はオン', () => {
+    expect(defaultQr([])).toBe(true);
+    expect(defaultQr([{ cook: false }])).toBe(false);
+    expect(defaultQr([{ cook: false }, { cook: false }])).toBe(false);
+    expect(defaultQr([{ cook: false }, {}])).toBe(true);
+    expect(defaultQr([{ cook: true }])).toBe(true);
+  });
+  it('現在の価格にしたとき、調理の要否もメニューに合わせる。数量は保つ', () => {
+    const lines: CartLine[] = [{ menuId: 'g', name: 'Tシャツ', price: 2500, qty: 2 }];
+    expect(applyCurrentPrice(lines, 'g', [goods])).toEqual([{ menuId: 'g', name: 'Tシャツ', price: 3000, qty: 2, cook: false }]);
   });
 });
 

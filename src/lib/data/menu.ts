@@ -34,6 +34,7 @@ export function watchMenu(eventId: string, cb: (items: MenuItem[]) => void, onEr
             price: Number(d.get('price') ?? 0),
             order: Number(d.get('order') ?? 0),
             soldOut: d.get('soldOut') === true,
+            cook: d.get('cook') !== false,
           })),
         ),
       ),
@@ -66,12 +67,12 @@ function checkPatch(patch: { name?: string; price?: number }): AppError | null {
  * 追加（order = 最大 + 10）。名前・価格も、ここで検査する（オフラインで不正な値を足すと、つながるまで一覧に出てしまうため）。
  * 100件を超えるなら AppError('validation')。件数は、この端末が見ている一覧で数える（ルールでは数えられない。data-model.md §2.5）
  */
-export function addMenuItem(eventId: string, input: { name: string; price: number }, items: readonly MenuItem[]): Promise<void> {
+export function addMenuItem(eventId: string, input: { name: string; price: number; cook?: boolean }, items: readonly MenuItem[]): Promise<void> {
   if (items.length >= MENU_MAX) return Promise.reject(validationError(`メニューは${MENU_MAX}件までです`));
   const invalid = checkPatch(input);
   if (invalid) return Promise.reject(invalid);
   const ref = doc(menuCol(eventId));
-  return write(setDoc(ref, { name: input.name, price: input.price, order: nextMenuOrder(items), soldOut: false }));
+  return write(setDoc(ref, { name: input.name, price: input.price, order: nextMenuOrder(items), soldOut: false, cook: input.cook !== false }));
 }
 
 /**
@@ -89,12 +90,12 @@ export function addMenuItemsBulk(eventId: string, lines: readonly ParsedLine[], 
   }
   const start = nextMenuOrder(items);
   const batch = writeBatch(db);
-  lines.forEach((l, k) => batch.set(doc(menuCol(eventId)), { name: l.name, price: l.price, order: start + k * ORDER_STEP, soldOut: false }));
+  lines.forEach((l, k) => batch.set(doc(menuCol(eventId)), { name: l.name, price: l.price, order: start + k * ORDER_STEP, soldOut: false, cook: true }));
   return write(batch.commit());
 }
 
-/** 名前・価格・売り切れの更新。検査してから書く */
-export function updateMenuItem(eventId: string, id: string, patch: Partial<Pick<MenuItem, 'name' | 'price' | 'soldOut'>>): Promise<void> {
+/** 名前・価格・売り切れ・調理の要否の更新。検査してから書く */
+export function updateMenuItem(eventId: string, id: string, patch: Partial<Pick<MenuItem, 'name' | 'price' | 'soldOut' | 'cook'>>): Promise<void> {
   const invalid = checkPatch(patch);
   if (invalid) return Promise.reject(invalid);
   return write(updateDoc(doc(menuCol(eventId), id), patch));

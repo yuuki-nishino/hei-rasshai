@@ -103,9 +103,11 @@ export function MenuPage({ eventId }: { eventId: string }) {
   );
 }
 
-function AddForm({ items, onAdd }: { items: MenuItem[]; onAdd: (input: { name: string; price: number }) => void }) {
+function AddForm({ items, onAdd }: { items: MenuItem[]; onAdd: (input: { name: string; price: number; cook: boolean }) => void }) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
+  // 調理が必要か。続けてグッズを足すことが多いため、追加のあとも、選択を残す
+  const [cook, setCook] = useState(true);
   const [errors, setErrors] = useState<{ name?: string; price?: string }>({});
   const nameRef = useRef<HTMLDivElement>(null);
   const full = items.length >= MENU_MAX;
@@ -118,7 +120,7 @@ function AddForm({ items, onAdd }: { items: MenuItem[]; onAdd: (input: { name: s
       setErrors({ name: n === null ? MENU_NAME_ERROR : undefined, price: p === null ? PRICE_ERROR : undefined });
       return;
     }
-    onAdd({ name: n, price: p });
+    onAdd({ name: n, price: p, cook });
     setName('');
     setPrice('');
     setErrors({});
@@ -146,6 +148,10 @@ function AddForm({ items, onAdd }: { items: MenuItem[]; onAdd: (input: { name: s
         error={errors.price}
         onInput={(e: TargetedEvent<HTMLInputElement>) => setPrice(e.currentTarget.value)}
       />
+      <label class={styles.cookCheck}>
+        <input type="checkbox" checked={cook} onChange={(e) => setCook(e.currentTarget.checked)} />
+        <span>調理が必要（グッズなど、すぐ渡す商品はオフ）</span>
+      </label>
       <div class={styles.addButton}>
         <Button type="submit" variant="primary" block disabled={full}>
           {full ? `メニューは${MENU_MAX}件までです` : '追加'}
@@ -159,7 +165,7 @@ type RowProps = {
   item: MenuItem;
   first: boolean;
   last: boolean;
-  onUpdate: (patch: Partial<Pick<MenuItem, 'name' | 'price' | 'soldOut'>>) => void;
+  onUpdate: (patch: Partial<Pick<MenuItem, 'name' | 'price' | 'soldOut' | 'cook'>>) => void;
   onMove: (dir: 'up' | 'down') => void;
   onDelete: () => void;
 };
@@ -287,6 +293,15 @@ function MenuRow({ item, first, last, onUpdate, onMove, onDelete }: RowProps) {
           onClick={() => onUpdate({ soldOut: !item.soldOut })}
         >
           {item.soldOut ? '売り切れ' : '販売中'}
+        </button>
+        <button
+          type="button"
+          class={styles.cookToggle}
+          aria-label={`${item.name}の調理の要否`}
+          aria-pressed={!item.cook}
+          onClick={() => onUpdate({ cook: !item.cook })}
+        >
+          {item.cook ? '調理あり' : '調理なし'}
         </button>
         <span class={styles.spacer} />
         <Button variant="danger" onClick={onDelete}>
