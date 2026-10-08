@@ -31,6 +31,7 @@ export function subscribeActiveOrders(eventId: string): () => void {
     },
     (e) => {
       activeOrdersError.value = e;
+      resetConnection(); // 購読が止まったあとに、古い判定が残らないように（PR #48 のレビュー C1）
       if (e.code === 'permission') selectEvent(null); // メンバーでなくなった（data-access.md §5）
     },
   );

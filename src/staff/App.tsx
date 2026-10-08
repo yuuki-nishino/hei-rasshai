@@ -72,7 +72,7 @@ function EventHome() {
 
   return (
     <>
-      <StatusBar connection={statusView.value.connection} pendingCount={statusView.value.pendingCount} />
+      <StatusBar {...statusView.value} />
       <Noren
         title={event?.name ?? 'イベント'}
         sub={event ? formatDayRange(event.startDate, event.endDate) : undefined}

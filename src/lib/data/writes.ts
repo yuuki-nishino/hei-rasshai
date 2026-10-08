@@ -18,7 +18,13 @@ export function trackWrite(p: Promise<void>, onRejected: (e: AppError) => void):
   pendingWrites.value++;
   p.then(
     () => {},
-    (e: unknown) => onRejected(toAppError(e)),
+    (e: unknown) => {
+      try {
+        onRejected(toAppError(e));
+      } catch (err) {
+        console.error(err); // 通知の失敗で、unhandled rejection にしない（PR #48 のレビュー C4）
+      }
+    },
   ).finally(() => {
     pendingWrites.value--;
   });

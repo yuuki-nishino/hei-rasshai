@@ -26,25 +26,25 @@ describe('connectionStatus（data-access.md §6.1）', () => {
 describe('statusBarView（ヘッダーの表示）', () => {
   const view = (connection: 'online' | 'offline', pendingWrites = 0, pendingUnknown = false) => statusBarView({ connection, pendingWrites, pendingUnknown });
 
-  it('オンラインで、未送信なし → オンライン', () => {
-    expect(view('online')).toEqual({ connection: 'online', pendingCount: null });
+  it('オンラインで、未送信なし → 何も出さない（online）', () => {
+    expect(view('online')).toEqual({ connection: 'online', pendingCount: null, pendingUnknown: false });
   });
 
   it('未送信の件数がある → 未送信◯件', () => {
-    expect(view('online', 3)).toEqual({ connection: 'pending', pendingCount: 3 });
+    expect(view('online', 3)).toEqual({ connection: 'pending', pendingCount: 3, pendingUnknown: false });
   });
 
   it('件数は不明だが、未送信がある（再読み込み後）→ 未送信あり', () => {
-    expect(view('online', 0, true)).toEqual({ connection: 'pending', pendingCount: null });
+    expect(view('online', 0, true)).toEqual({ connection: 'pending', pendingCount: null, pendingUnknown: true });
   });
 
   it('件数があれば、不明の印より、件数を出す', () => {
-    expect(view('online', 2, true)).toEqual({ connection: 'pending', pendingCount: 2 });
+    expect(view('online', 2, true)).toEqual({ connection: 'pending', pendingCount: 2, pendingUnknown: false });
   });
 
-  it('オフラインは、未送信より優先する。数えられている件数は渡す', () => {
-    expect(view('offline')).toEqual({ connection: 'offline', pendingCount: null });
-    expect(view('offline', 2)).toEqual({ connection: 'offline', pendingCount: 2 });
-    expect(view('offline', 0, true)).toEqual({ connection: 'offline', pendingCount: null });
+  it('オフラインは、未送信より優先する。未送信の件数・不明も渡す（C2）', () => {
+    expect(view('offline')).toEqual({ connection: 'offline', pendingCount: null, pendingUnknown: false });
+    expect(view('offline', 2)).toEqual({ connection: 'offline', pendingCount: 2, pendingUnknown: false });
+    expect(view('offline', 0, true)).toEqual({ connection: 'offline', pendingCount: null, pendingUnknown: true });
   });
 });

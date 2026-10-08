@@ -14,6 +14,7 @@ vi.mock('../../src/lib/firebase/staff', async () => {
 });
 
 const { changeNote, confirmOrder, findOrderOnServer, newOrderId, transitionOrder, watchActiveOrders } = await import('../../src/lib/data/orders');
+const { reconnectNow } = await import('../../src/lib/data/online');
 const { checkPendingAfterReload, pendingUnknown, pendingWrites, trackWrite } = await import('../../src/lib/data/writes');
 type Order = import('../../src/lib/data/types').Order;
 type AppError = import('../../src/lib/data/errors').AppError;
@@ -114,6 +115,32 @@ describe('trackWrite', () => {
     await waitFor(() => (onRejected.mock.calls.length === 1 ? true : undefined));
     expect(onRejected.mock.calls[0]?.[0]).toMatchObject({ code: 'validation' });
     await waitFor(() => (pendingWrites.value === 0 ? true : undefined));
+  });
+});
+
+describe('reconnectNow', () => {
+  it('ネットワークを入れ直しても、未送信は残り、そのまま送られる', async () => {
+    const db = setUser(ALICE);
+    const id = await newOrder(ALICE);
+    await disableNetwork(db);
+    const order = (await findOrderOnServer('e1', id).catch(() => null)) ?? ({ id, status: 'preparing', cancelledFrom: null } as const);
+    trackWrite(transitionOrder('e1', order, 'ready', ALICE), () => {});
+    expect(pendingWrites.value).toBe(1);
+    await reconnectNow();
+    await waitFor(() => (pendingWrites.value === 0 ? true : undefined));
+    expect(await rawStatus(id)).toBe('ready');
+  });
+});
+
+describe('trackWrite の通知の失敗', () => {
+  it('onRejected が例外を投げても、数えは戻り、unhandled rejection にならない（C4）', async () => {
+    setUser(ALICE);
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    trackWrite(changeNote('e1', 'x', 'あ'.repeat(101), ALICE), () => {
+      throw new Error('通知の失敗');
+    });
+    await waitFor(() => (pendingWrites.value === 0 && spy.mock.calls.length > 0 ? true : undefined));
+    spy.mockRestore();
   });
 });
 

@@ -21,19 +21,23 @@ export function connectionStatus({ browserOnline, fromCacheSince, now }: Connect
 }
 
 export interface StatusBarView {
+  /** online：何も表示しない（オンライン前提のアプリのため、問題があるときだけ出す） */
   connection: ConnectionState | 'pending';
-  /** 未送信の件数。数えられない（再読み込み後）ときは null */
+  /** 未送信の件数。0件・数えられないときは null */
   pendingCount: number | null;
+  /** 件数は分からないが、未送信があるかもしれない（再読み込みの直後） */
+  pendingUnknown: boolean;
 }
 
 /**
- * ヘッダーの表示：オフライン ＞ 未送信あり ＞ オンライン。
- * オフラインのときも、数えられている未送信の件数は渡す（「オフライン（未送信◯件）」と出せるように）
+ * ヘッダーの表示：オフライン ＞ 未送信あり ＞ （何も出さない）。
+ * オフラインのときも、未送信の件数（または、不明であること）は渡す。未送信の警告が一番要るのは、オフラインのときのため
  */
 export function statusBarView(input: { connection: ConnectionState; pendingWrites: number; pendingUnknown: boolean }): StatusBarView {
   const { connection, pendingWrites, pendingUnknown } = input;
-  if (connection === 'offline') return { connection, pendingCount: pendingWrites > 0 ? pendingWrites : null };
-  if (pendingWrites > 0) return { connection: 'pending', pendingCount: pendingWrites };
-  if (pendingUnknown) return { connection: 'pending', pendingCount: null };
-  return { connection: 'online', pendingCount: null };
+  const pendingCount = pendingWrites > 0 ? pendingWrites : null;
+  const unknown = pendingCount === null && pendingUnknown;
+  if (connection === 'offline') return { connection, pendingCount, pendingUnknown: unknown };
+  if (pendingCount !== null || unknown) return { connection: 'pending', pendingCount, pendingUnknown: unknown };
+  return { connection: 'online', pendingCount: null, pendingUnknown: false };
 }

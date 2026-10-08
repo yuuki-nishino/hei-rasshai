@@ -191,6 +191,8 @@ Firestore SDK は、接続状態を直接は公開しない。次のように推
 
 - `connectionStatus({ browserOnline, fromCacheSince, now })`：`fromCacheSince` は、`fromCache` になった時刻（サーバーに届いている・購読していないときは `null`）。ちょうど10秒でオフライン
 - `state/connection.ts`：`watchActiveOrders` のスナップショットのたびに `reportSnapshot(fromCache)` を呼ぶ。`fromCache` になった時刻を覚え、スナップショットが来なくても、10秒後に判定をやり直す（タイマー）。購読を止めたら、`fromCache` の記録を消す（`navigator.onLine` だけで判定する）
+- ブラウザの `online` イベントで、`fromCache` の数え直しを始め（表示がすぐオンラインに戻る。まだつながらなければ、10秒でまたオフライン）、`reconnectNow()`（`disableNetwork` → `enableNetwork`。未送信は残る）で、SDK にすぐ再接続させる。SDK は再接続を間隔を空けて待つため、そのままでは、オンラインへの戻りの表示が遅れた（#19 の dev の確認）
+- 購読がエラーで止まったときも、`fromCache` の記録を消す（PR #48 のレビュー C1）
 - ★N1（遅すぎ・早すぎ）は、devの実機で確かめる（testing.md §5）
 
 ### 6.2 未送信の数え上げ
@@ -208,7 +210,8 @@ function trackWrite(p: Promise<void>, onRejected: (e: AppError) => void): void {
 }
 ```
 - 対象：`transitionOrder`、`changePayment`、`changeNote`（確定はオンライン必須のため対象外）。メニューの編集などは、数えなくてよい。数えるのは、**呼ぶ画面**（`trackWrite(transitionOrder(...), onRejected)`）。検証で失敗した操作（`validation`）も、拒否として通知し、数えは戻る
-- 表示（`statusBarView`）：オフライン ＞ 未送信あり ＞ オンライン。`pendingWrites > 0` なら「未送信◯件」。オフラインのときは、「オフライン（未送信◯件）」（件数が分かるときだけ）
+- 表示（`statusBarView`）：オフライン ＞ 未送信あり ＞ （出さない）。オンラインで未送信も無いときは、何も出さない。`pendingWrites > 0` なら「未送信◯件」。オフラインのときは、「通信状態が不安定です（未送信◯件）」。件数が不明なら「（未送信あり）」（C2）。**数えるのは、調理画面の操作（状態・支払い・メモ）だけ**。メニューの編集は数えない
+- 「未送信あり」（不明）は、再読み込み後の分が送られるまで出る。その間に新しく書いた分も待つため、新しい分が送られても、すべて片づくまで残ることがある（C3。件数は、新しい分だけを数える）
 - 再読み込みの直後（`main.tsx` の起動時に `checkPendingAfterReload`）は、`waitForPendingWrites(db)` を1.5秒だけ待ち、解決しなければ `pendingUnknown = true`（「未送信あり」。件数は不明）にし、解決したら消す
 - **既知の制約**：アプリを再読み込みすると、メモリ上の `Promise` が失われる。再読み込みをまたいで、サーバーに拒否された書き込みは、**通知できない**（画面は、購読で、サーバーの状態に戻る）。「未送信あり」が消えたあとで、調理画面の状態を確認する運用とする（C2）
 
