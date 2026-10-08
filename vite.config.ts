@@ -38,6 +38,7 @@ function staffPwa(): Plugin[] {
   return VitePWA({
     injectRegister: false,
     registerType: 'prompt',
+    includeAssets: ['icons/apple-touch-icon.png'], // manifest と manifest のアイコンは、プラグインが事前キャッシュに足す。<link rel="manifest"> も、ビルド時にプラグインが足す（index.html には書かない）
     manifest: {
       name: '毎度おおきに',
       short_name: '毎度おおきに',
@@ -54,8 +55,8 @@ function staffPwa(): Plugin[] {
       ],
     },
     workbox: {
-      // アプリ本体（HTML・JS・CSS・アイコン）を事前キャッシュする。手書きの文字（woff2。使った分だけ）は、下の実行時キャッシュ。古い形式（woff）は入れない
-      globPatterns: ['**/*.{html,js,css,png,webmanifest}'],
+      // アプリ本体（HTML・JS・CSS。アイコンは includeAssets と manifest）を事前キャッシュする。手書きの文字（woff2。使った分だけ）は、下の実行時キャッシュ。古い形式（woff）は入れない
+      globPatterns: ['**/*.{html,js,css}'],
       globIgnores: ['customer.html', 'assets/customer-*'],
       navigateFallback: '/index.html',
       navigateFallbackDenylist: [/^\/s(\/|\?|$)/, /^\/customer\.html/, /^\/__\//],
